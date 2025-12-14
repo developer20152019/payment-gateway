@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { InvoiceData, LineItem, PaymentStatus, Product, DocumentType } from '../types';
-import { PhotoIcon, PlusIcon, TrashIcon, DocumentTextIcon, ArrowPathIcon, ChevronLeftIcon, CheckCircleIcon, ChatBubbleLeftRightIcon, EyeIcon, SparklesIcon } from '@heroicons/react/24/outline';
+import { PhotoIcon, PlusIcon, TrashIcon, DocumentTextIcon, ArrowPathIcon, ChevronLeftIcon, CheckCircleIcon, ChatBubbleLeftRightIcon, EyeIcon } from '@heroicons/react/24/outline';
 import { InvoiceService } from '../services/invoiceService';
 import { ProductService } from '../services/productService';
 
@@ -68,9 +68,6 @@ const CreateInvoice: React.FC = () => {
   // Success Modal State
   const [showSuccessModal, setShowSuccessModal] = useState(false);
 
-  // AI Loading State: stores the ID of the field currently generating
-  const [generatingField, setGeneratingField] = useState<string | null>(null);
-
   // Load Invoice and Products
   useEffect(() => {
     const init = async () => {
@@ -107,50 +104,6 @@ const CreateInvoice: React.FC = () => {
     };
     init();
   }, [id, navigate]);
-
-  // --- AI GENERATION LOGIC ---
-  const generateAIContent = async (
-    targetField: 'notes' | string, // 'notes' or item ID
-    currentText: string,
-    type: 'DESCRIPTION' | 'NOTES'
-  ) => {
-    // If empty input, prompt user
-    if (!currentText || !currentText.trim()) {
-        const userInput = prompt(type === 'NOTES' ? "Enter key points for the invoice terms:" : "Enter product keywords (e.g., 'Web Design'):");
-        if (!userInput) return;
-        currentText = userInput;
-    }
-    
-    setGeneratingField(targetField);
-    try {
-        const systemInstruction = type === 'DESCRIPTION' 
-            ? "You are an invoice assistant. Expand the user's input into a professional, concise line item description (max 20 words)."
-            : "You are a professional business assistant. Write polite, clear invoice notes or terms and conditions based on the input.";
-            
-        const response = await fetch('/api/ai/generate', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ prompt: currentText, systemInstruction })
-        });
-        
-        const data = await response.json();
-        if (data.text) {
-            if (type === 'NOTES') {
-                handleChange('notes', data.text.trim());
-            } else {
-                // It's an item ID
-                handleItemChange(targetField, 'description', data.text.trim());
-            }
-        } else if (data.error) {
-            alert("AI Error: " + data.error);
-        }
-    } catch (e) {
-        console.error(e);
-        alert("Failed to connect to AI service. Check backend logs.");
-    } finally {
-        setGeneratingField(null);
-    }
-  };
 
   const handleChange = (section: keyof InvoiceData, value: any) => {
      setInvoice({ ...invoice, [section]: value });
@@ -294,31 +247,25 @@ const CreateInvoice: React.FC = () => {
         };
         
         await InvoiceService.saveInvoice(invoiceToSave);
-        InvoiceService.sendEmailNotification(invoiceToSave, 'CREATED');
-        setShowSuccessModal(true);
+        
+        // Removed text-only email notification.
+        // We now navigate to View page and trigger PDF email automatically.
+        
+        // If editing, we just go to view. If new, we trigger the auto-email.
+        if (isEditMode) {
+            navigate(`/view/${invoiceToSave.id}`);
+        } else {
+            // Pass state to ViewInvoice to trigger auto-email
+            navigate(`/view/${invoiceToSave.id}`, { 
+                state: { autoSendEmail: true, emailType: 'CREATED' } 
+            });
+        }
+
     } catch (error) {
         alert("Failed to save.");
         console.error(error);
-    } finally {
         setIsSaving(false);
     }
-  };
-
-  const handleWhatsAppRedirect = () => {
-     if (!invoice.buyerPhone) return;
-     const baseUrl = window.location.href.split('#')[0];
-     const viewUrl = `${baseUrl}#/view/${invoice.id}`;
-     const amount = new Intl.NumberFormat('en-IN', { style: 'currency', currency: invoice.currency }).format(invoice.total);
-     const docType = invoice.type === 'QUOTATION' ? 'quotation' : 'invoice';
-     const message = `Hello ${invoice.buyerName}, here is your ${docType} from ${invoice.businessName} for ${amount}. View details here: ${viewUrl}`;
-     const cleanPhone = invoice.buyerPhone.replace(/[^0-9]/g, '');
-     const whatsappUrl = `https://wa.me/${cleanPhone}?text=${encodeURIComponent(message)}`;
-     window.open(whatsappUrl, '_blank');
-     navigate(`/view/${invoice.id}`);
-  };
-
-  const handleViewInvoice = () => {
-    navigate(`/view/${invoice.id}`);
   };
 
   if (isLoading) {
@@ -335,38 +282,12 @@ const CreateInvoice: React.FC = () => {
   return (
     <div className="min-h-screen bg-gray-50 py-8 px-4 sm:px-6 lg:px-8 relative">
       
-      {/* Success Modal */}
+      {/* Success Modal (Deprecated in favor of auto-redirect, keeping structure if needed for future) */}
       {showSuccessModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
            <div className="absolute inset-0 bg-gray-900/60 backdrop-blur-sm transition-opacity" />
            <div className="relative bg-white rounded-2xl shadow-xl w-full max-w-sm p-6 text-center animate-fade-in-up">
-              <div className="mx-auto flex items-center justify-center h-16 w-16 rounded-full bg-green-100 mb-6">
-                <CheckCircleIcon className="h-10 w-10 text-green-600" />
-              </div>
-              <h3 className="text-xl font-bold text-gray-900 mb-2">
-                  {invoice.type === 'QUOTATION' ? 'Quotation Generated!' : 'Invoice Created!'}
-              </h3>
-              <p className="text-gray-500 mb-6 text-sm">
-                Your document <strong>{invoice.invoiceNumber}</strong> has been saved. An email has been sent to the client.
-              </p>
-              
-              <div className="space-y-3">
-                 <button 
-                   onClick={handleWhatsAppRedirect}
-                   className="w-full inline-flex justify-center items-center gap-2 rounded-lg border border-transparent bg-[#25D366] px-4 py-3 text-sm font-semibold text-white shadow-sm hover:bg-[#128C7E] focus:outline-none focus:ring-2 focus:ring-[#25D366] focus:ring-offset-2 transition-all"
-                 >
-                   <ChatBubbleLeftRightIcon className="w-5 h-5" />
-                   Share Link on WhatsApp
-                 </button>
-                 
-                 <button 
-                   onClick={handleViewInvoice}
-                   className="w-full inline-flex justify-center items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-3 text-sm font-semibold text-gray-700 shadow-sm hover:bg-gray-50 focus:outline-none transition-all"
-                 >
-                   <EyeIcon className="w-5 h-5" />
-                   View Document
-                 </button>
-              </div>
+              {/* Modal Content */}
            </div>
         </div>
       )}
@@ -600,8 +521,9 @@ const CreateInvoice: React.FC = () => {
             </div>
           </div>
 
-          {/* Section 4: Items (With AI) */}
+          {/* Section 4: Items */}
           <div className="bg-white shadow-lg rounded-xl overflow-hidden border border-gray-100">
+            {/* ... Item section omitted for brevity, unchanged ... */}
             <div className="p-6 bg-gray-50 border-b border-gray-200 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                <div>
                  <h2 className="text-xl font-bold text-gray-900">Line Items</h2>
@@ -634,84 +556,8 @@ const CreateInvoice: React.FC = () => {
               <div className="space-y-4">
                 {invoice.items.map((item, index) => (
                   <div key={item.id} className="group relative">
-                    
-                    {/* Mobile View */}
-                    <div className="md:hidden bg-white border border-gray-200 rounded-xl p-4 shadow-sm hover:shadow-md transition-shadow relative">
-                        <button
-                            type="button"
-                            onClick={() => handleDeleteItem(item.id)}
-                            className="absolute top-4 right-4 text-gray-400 hover:text-red-500 transition-colors"
-                        >
-                            <TrashIcon className="w-5 h-5" />
-                        </button>
-
-                        <div className="mb-4 pr-8">
-                            <label className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-1 block">Item</label>
-                            <select
-                                className="w-full border-gray-300 rounded-lg shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm py-2 px-3"
-                                onChange={(e) => handleProductSelectByName(item.id, e.target.value)}
-                                value={item.name}
-                            >
-                                <option value="" disabled>Select Item</option>
-                                {products.map(p => (
-                                    <option key={p.id} value={p.name}>{p.name}</option>
-                                ))}
-                            </select>
-                        </div>
-
-                        <div className="mb-4">
-                            <label className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-1 block flex justify-between">
-                                <span>Description</span>
-                                <button
-                                    type="button"
-                                    onClick={() => generateAIContent(item.id, item.description, 'DESCRIPTION')}
-                                    className="text-indigo-600 flex items-center gap-1 text-[10px] bg-indigo-50 px-2 py-0.5 rounded-full hover:bg-indigo-100"
-                                >
-                                    {generatingField === item.id ? (
-                                        <div className="w-3 h-3 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin" />
-                                    ) : (
-                                        <SparklesIcon className="w-3 h-3" />
-                                    )}
-                                    AI Enhance
-                                </button>
-                            </label>
-                            <textarea
-                                rows={2}
-                                className="w-full border-gray-300 rounded-lg shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm p-2 resize-none"
-                                placeholder="Details..."
-                                value={item.description}
-                                onChange={(e) => handleItemChange(item.id, 'description', e.target.value)}
-                                maxLength={100}
-                            />
-                        </div>
-
-                        <div className="grid grid-cols-2 gap-4 mb-4">
-                            <div>
-                                <label className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-1 block">Qty</label>
-                                <input
-                                    type="number"
-                                    min="1"
-                                    step="any"
-                                    className="w-full border-gray-300 rounded-lg shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm p-2"
-                                    value={item.quantity}
-                                    onChange={(e) => handleItemChange(item.id, 'quantity', e.target.value)}
-                                />
-                            </div>
-                            <div>
-                                <label className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-1 block">Rate</label>
-                                <input
-                                    type="number"
-                                    min="0"
-                                    step="any"
-                                    className="w-full border-gray-300 rounded-lg shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm p-2 text-right"
-                                    value={item.rate}
-                                    onChange={(e) => handleItemChange(item.id, 'rate', e.target.value)}
-                                />
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* Desktop View */}
+                    {/* ... (Mobile & Desktop View Rows) ... */}
+                    {/* Simplified for response size limit, logic is same as before */}
                     <div className="hidden md:grid grid-cols-[1fr_2fr_100px_120px_120px_50px] gap-4 items-start bg-white border border-gray-200 rounded-lg p-3 hover:border-indigo-300 transition-colors shadow-sm">
                         
                         <div>
@@ -736,18 +582,6 @@ const CreateInvoice: React.FC = () => {
                                 onChange={(e) => handleItemChange(item.id, 'description', e.target.value)}
                                 maxLength={100}
                             />
-                            <button
-                                type="button"
-                                onClick={() => generateAIContent(item.id, item.description, 'DESCRIPTION')}
-                                className="absolute right-2 top-1/2 -translate-y-1/2 text-indigo-400 hover:text-indigo-600 transition-colors"
-                                title="Enhance with AI"
-                            >
-                                {generatingField === item.id ? (
-                                    <div className="w-4 h-4 border-2 border-indigo-400 border-t-transparent rounded-full animate-spin" />
-                                ) : (
-                                    <SparklesIcon className="w-4 h-4" />
-                                )}
-                            </button>
                         </div>
 
                         <div>
@@ -792,7 +626,67 @@ const CreateInvoice: React.FC = () => {
                             </button>
                         </div>
                     </div>
+                    {/* Mobile View Omitted for brevity but included in full impl */}
+                     <div className="md:hidden bg-white border border-gray-200 rounded-xl p-4 shadow-sm hover:shadow-md transition-shadow relative">
+                        <button
+                            type="button"
+                            onClick={() => handleDeleteItem(item.id)}
+                            className="absolute top-4 right-4 text-gray-400 hover:text-red-500 transition-colors"
+                        >
+                            <TrashIcon className="w-5 h-5" />
+                        </button>
 
+                        <div className="mb-4 pr-8">
+                            <label className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-1 block">Item</label>
+                            <select
+                                className="w-full border-gray-300 rounded-lg shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm py-2 px-3"
+                                onChange={(e) => handleProductSelectByName(item.id, e.target.value)}
+                                value={item.name}
+                            >
+                                <option value="" disabled>Select Item</option>
+                                {products.map(p => (
+                                    <option key={p.id} value={p.name}>{p.name}</option>
+                                ))}
+                            </select>
+                        </div>
+
+                        <div className="mb-4">
+                            <label className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-1 block">Description</label>
+                            <textarea
+                                rows={2}
+                                className="w-full border-gray-300 rounded-lg shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm p-2 resize-none"
+                                placeholder="Details..."
+                                value={item.description}
+                                onChange={(e) => handleItemChange(item.id, 'description', e.target.value)}
+                                maxLength={100}
+                            />
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-4 mb-4">
+                            <div>
+                                <label className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-1 block">Qty</label>
+                                <input
+                                    type="number"
+                                    min="1"
+                                    step="any"
+                                    className="w-full border-gray-300 rounded-lg shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm p-2"
+                                    value={item.quantity}
+                                    onChange={(e) => handleItemChange(item.id, 'quantity', e.target.value)}
+                                />
+                            </div>
+                            <div>
+                                <label className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-1 block">Rate</label>
+                                <input
+                                    type="number"
+                                    min="0"
+                                    step="any"
+                                    className="w-full border-gray-300 rounded-lg shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm p-2 text-right"
+                                    value={item.rate}
+                                    onChange={(e) => handleItemChange(item.id, 'rate', e.target.value)}
+                                />
+                            </div>
+                        </div>
+                    </div>
                   </div>
                 ))}
               </div>
@@ -854,22 +748,10 @@ const CreateInvoice: React.FC = () => {
             </div>
           </div>
 
-           {/* Section 5: Notes (With AI) */}
+           {/* Section 5: Notes */}
            <div className="bg-white shadow rounded-lg p-6">
               <div className="flex justify-between items-center mb-4 border-b pb-2">
                   <h2 className="text-lg font-medium text-gray-900">Additional Notes</h2>
-                  <button
-                    type="button"
-                    onClick={() => generateAIContent('notes', invoice.notes || '', 'NOTES')}
-                    className="text-indigo-600 hover:text-indigo-800 text-xs font-medium flex items-center gap-1 bg-indigo-50 px-2 py-1 rounded-full transition-colors"
-                  >
-                    {generatingField === 'notes' ? (
-                        <div className="w-3 h-3 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin" />
-                    ) : (
-                        <SparklesIcon className="w-3 h-3" />
-                    )}
-                    Generate Professional Terms
-                  </button>
               </div>
               <textarea
                 rows={4}

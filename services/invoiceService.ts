@@ -158,6 +158,35 @@ export const InvoiceService = {
     }
   },
 
+  sendPdfByEmail: async (invoice: InvoiceData, pdfBase64: string): Promise<void> => {
+    const link = `${window.location.origin}${window.location.pathname}#/view/${invoice.id}`;
+    // Strip data URI prefix if present (e.g. "data:application/pdf;base64,")
+    const base64Content = pdfBase64.includes(',') ? pdfBase64.split(',')[1] : pdfBase64;
+
+    const response = await fetch(`${API_BASE}/notify`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            to: invoice.buyerEmail,
+            subject: `${invoice.type === 'QUOTATION' ? 'Quotation' : 'Invoice'} #${invoice.invoiceNumber} from ${invoice.businessName}`,
+            body: `Please find the attached ${invoice.type.toLowerCase()} PDF.`,
+            link: link,
+            type: 'MANUAL_PDF',
+            attachments: [
+                {
+                    filename: `${invoice.invoiceNumber}.pdf`,
+                    content: base64Content,
+                    encoding: 'base64'
+                }
+            ]
+        })
+    });
+
+    if (!response.ok) {
+        throw new Error('Failed to send email');
+    }
+  },
+
   // --- CCAvenue Initiation ---
   initiatePaymentSequence: async (invoice: InvoiceData): Promise<{ paymentHtml: string }> => {
     const API_URL = `${API_BASE}/payment/initiate`;

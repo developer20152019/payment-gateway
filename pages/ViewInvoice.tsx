@@ -1,27 +1,70 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { InvoiceData, PaymentStatus } from '../types';
 import { InvoicePreview } from '../components/InvoicePreview';
-import { ShieldCheckIcon, ShareIcon, PrinterIcon, ArrowDownTrayIcon, CheckCircleIcon, XCircleIcon } from '@heroicons/react/24/outline';
+import { ShieldCheckIcon, ShareIcon, PrinterIcon, ArrowDownTrayIcon, CheckCircleIcon, XCircleIcon, EnvelopeIcon } from '@heroicons/react/24/outline';
 import { InvoiceService } from '../services/invoiceService';
 
 const ViewInvoice: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
   
   const [invoice, setInvoice] = useState<InvoiceData | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
+  const [isSendingEmail, setIsSendingEmail] = useState(false);
   const [notification, setNotification] = useState<{message: string, type: 'success' | 'info' | 'error'} | null>(null);
+
+  // Helper to show notifications
+  const showNotification = (msg: string, type: 'success' | 'info' | 'error' = 'info') => {
+    setNotification({ message: msg, type });
+    setTimeout(() => setNotification(null), 5000);
+  };
+
+  // Reusable PDF E-mailing Function
+  const generateAndSendPDF = useCallback(async (currentInvoice: InvoiceData, triggerType: 'CREATED' | 'PAID') => {
+    setIsSendingEmail(true);
+    showNotification(triggerType === 'PAID' ? "Sending Payment Receipt..." : "Sending Invoice PDF...", 'info');
+    
+    // Slight delay to allow DOM to update (e.g. show PAID badge)
+    await new Promise(resolve => setTimeout(resolve, 1000));
+
+    const element = document.getElementById('invoice-content');
+    if (!element || typeof (window as any).html2pdf === 'undefined') {
+        console.error("PDF generation failed: Library missing or element not found");
+        setIsSendingEmail(false);
+        return;
+    }
+
+    const opt = {
+        margin: 5,
+        filename: `${currentInvoice.invoiceNumber}.pdf`,
+        image: { type: 'jpeg', quality: 0.98 },
+        html2canvas: { scale: 2, useCORS: true },
+        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+    };
+
+    try {
+        const pdfBase64 = await (window as any).html2pdf().from(element).set(opt).outputPdf('datauristring');
+        await InvoiceService.sendPdfByEmail(currentInvoice, pdfBase64);
+        showNotification("Email sent successfully!", 'success');
+    } catch (error: any) {
+        console.error("Email Error:", error);
+        showNotification("Failed to send email.", 'error');
+    } finally {
+        setIsSendingEmail(false);
+    }
+  }, []);
 
   // Fetch Invoice Data
   const fetchInvoice = useCallback(async () => {
     if (id) {
       try {
-         // Add timestamp to avoid caching old status
          const data = await InvoiceService.getInvoiceById(id);
          if (data) {
            setInvoice(data);
+           return data;
          } else {
            alert("Document not found");
            navigate('/');
@@ -31,27 +74,39 @@ const ViewInvoice: React.FC = () => {
          alert("Error loading document");
       }
     }
+    return null;
   }, [id, navigate]);
 
-  // Initial Load
+  // Initial Load & Auto-Email Trigger
   useEffect(() => {
-    fetchInvoice();
-  }, [fetchInvoice]);
+    let mounted = true;
+    
+    const loadAndCheckAutoSend = async () => {
+        const data = await fetchInvoice();
+        
+        // Check if we navigated here with a request to auto-send email (Creation flow)
+        if (data && mounted && location.state?.autoSendEmail) {
+            // Clear state so it doesn't fire on refresh
+            window.history.replaceState({}, document.title);
+            generateAndSendPDF(data, location.state.emailType || 'CREATED');
+        }
+    };
+
+    loadAndCheckAutoSend();
+
+    return () => { mounted = false; };
+  }, [fetchInvoice, location.state, generateAndSendPDF]);
 
   // --- LISTEN FOR POPUP MESSAGES (CCAvenue) ---
   useEffect(() => {
     const handleMessage = (event: MessageEvent) => {
       if (typeof event.data !== 'string') return;
-
-      console.log("Payment Event Received:", event.data);
-
       if (event.data === 'PAYMENT_SUCCESS') {
         handlePaymentSuccess();
       } else if (event.data === 'PAYMENT_CANCEL') {
         handlePaymentCancel();
       }
     };
-
     window.addEventListener('message', handleMessage);
     return () => window.removeEventListener('message', handleMessage);
   }, [invoice]); 
@@ -67,11 +122,6 @@ const ViewInvoice: React.FC = () => {
     });
   };
 
-  const showNotification = (msg: string, type: 'success' | 'info' | 'error' = 'info') => {
-    setNotification({ message: msg, type });
-    setTimeout(() => setNotification(null), 5000);
-  };
-
   // --- RAZORPAY HANDLER ---
   const handleRazorpayPayment = async () => {
     if (!invoice) return;
@@ -85,19 +135,16 @@ const ViewInvoice: React.FC = () => {
     }
 
     try {
-      // 1. Create Order on Backend
       const order = await InvoiceService.createRazorpayOrder(invoice);
-
       const options = {
         key: order.key_id,
         amount: order.amount,
         currency: order.currency,
         name: invoice.businessName,
         description: `Invoice #${invoice.invoiceNumber}`,
-        image: invoice.logoUrl, // Use invoice logo if available
+        image: invoice.logoUrl,
         order_id: order.id,
         handler: async function (response: any) {
-          // 2. Verify Payment on Backend
           showNotification("Verifying payment...", 'info');
           const success = await InvoiceService.verifyRazorpayPayment(response, invoice.id);
           if (success) {
@@ -137,10 +184,7 @@ const ViewInvoice: React.FC = () => {
     setIsLoading(true);
 
     try {
-      // 1. Get Payment Form HTML from Backend
       const response = await InvoiceService.initiatePaymentSequence(invoice);
-      
-      // 2. Open Popup Window
       const width = 500;
       const height = 600;
       const left = (window.innerWidth - width) / 2;
@@ -153,7 +197,6 @@ const ViewInvoice: React.FC = () => {
       );
 
       if (paymentWindow) {
-        // Write the form to the popup and let it auto-submit
         paymentWindow.document.write(response.paymentHtml);
         paymentWindow.document.close();
         paymentWindow.focus();
@@ -171,11 +214,9 @@ const ViewInvoice: React.FC = () => {
 
   const handlePayNow = () => {
       if(!invoice) return;
-      
       if(invoice.paymentGateway === 'Razorpay') {
           handleRazorpayPayment();
       } else {
-          // Default to CCAvenue
           handleCCAvenuePayment();
       }
   };
@@ -184,21 +225,18 @@ const ViewInvoice: React.FC = () => {
   const handlePaymentSuccess = async () => {
     if (!invoice) return;
     
-    showNotification("Payment Confirmed! Invoice marked as Paid.", 'success');
+    showNotification("Payment Confirmed! Updating status...", 'success');
 
     // 1. IMMEDIATE UI UPDATE (Hide Button, Show Badge)
     const updatedInvoice = { ...invoice, status: PaymentStatus.PAID };
     setInvoice(updatedInvoice);
 
-    // 2. Persist to Backend (or LocalStorage if offline)
-    // Note: Razorpay backend verify already updates DB, but this ensures LocalStorage sync
+    // 2. Persist to Backend
     await InvoiceService.updateStatus(invoice.id, PaymentStatus.PAID);
 
-    // 3. Send Email Notification with updated link
-    InvoiceService.sendEmailNotification(updatedInvoice, 'PAID');
-
-    // 4. Background Sync
-    setTimeout(() => fetchInvoice(), 1000);
+    // 3. Auto-Send Email with PDF Receipt
+    // We pass 'updatedInvoice' directly because state updates might be async
+    generateAndSendPDF(updatedInvoice, 'PAID');
   };
 
   // --- CANCEL HANDLER ---
@@ -266,6 +304,16 @@ const ViewInvoice: React.FC = () => {
         </div>
       )}
 
+      {/* Sending Overlay */}
+      {isSendingEmail && (
+          <div className="fixed inset-0 z-[1000] bg-black/20 backdrop-blur-[1px] flex items-end sm:items-top justify-center pt-20">
+              <div className="bg-white rounded-full px-6 py-3 shadow-2xl flex items-center gap-3 animate-pulse">
+                  <div className="w-4 h-4 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin"></div>
+                  <span className="font-medium text-indigo-900 text-sm">Generating PDF & Sending Email...</span>
+              </div>
+          </div>
+      )}
+
       {/* Navbar */}
       <nav className="bg-white border-b border-gray-200 px-4 py-4 sticky top-0 z-30 no-print">
         <div className="max-w-5xl mx-auto flex justify-between items-center">
@@ -274,6 +322,8 @@ const ViewInvoice: React.FC = () => {
              PayLink
           </div>
           <div className="flex gap-2 items-center">
+             {/* MANUAL BUTTON REMOVED per requirements */}
+             
              <button 
               onClick={handleDownloadPdf} 
               disabled={isDownloading}

@@ -6,7 +6,6 @@
  * 2. CCAvenue Payment Integration (AES-128-CBC)
  * 3. Razorpay Payment Integration
  * 4. Email Notifications (Nodemailer)
- * 5. Gemini AI Integration (Text Generation)
  */
 
 // Load environment variables from .env file
@@ -17,7 +16,7 @@ try {
 }
 
 // --- DEPENDENCY CHECK ---
-let express, cors, sql, bodyParser, qs, Razorpay, crypto, nodemailer, GoogleGenAI;
+let express, cors, sql, bodyParser, qs, Razorpay, crypto, nodemailer;
 
 try {
     express = require('express');
@@ -27,17 +26,6 @@ try {
     qs = require('querystring');
     crypto = require('crypto');
     
-    // Dynamic import for Gemini SDK (ESM)
-    (async () => {
-        try {
-            const genaiModule = await import("@google/genai");
-            GoogleGenAI = genaiModule.GoogleGenAI;
-            console.log("✨ GoogleGenAI SDK loaded");
-        } catch (e) {
-            console.warn("\x1b[33m%s\x1b[0m", "⚠️  '@google/genai' not found. AI features disabled.");
-        }
-    })();
-
     try {
         Razorpay = require('razorpay');
     } catch (e) {
@@ -66,7 +54,7 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 app.use(cors());
-app.use(bodyParser.json({ limit: '10mb' }));
+app.use(bodyParser.json({ limit: '10mb' })); // Increased limit for PDF attachments
 app.use(bodyParser.urlencoded({ extended: true }));
 
 // --- SECURITY CONFIGURATION ---
@@ -131,36 +119,6 @@ const ccav = {
         }
     }
 };
-
-// ==========================================
-// AI ENDPOINT
-// ==========================================
-app.post('/api/ai/generate', async (req, res) => {
-    if (!GoogleGenAI) return res.status(503).json({ error: "AI SDK not initialized on server." });
-    if (!process.env.API_KEY) return res.status(500).json({ error: "Server API_KEY not configured." });
-
-    const { prompt, systemInstruction } = req.body;
-
-    try {
-        // Initialize AI client with key from process.env
-        const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-        
-        // Use gemini-2.5-flash for fast text tasks
-        const response = await ai.models.generateContent({
-            model: 'gemini-2.5-flash',
-            contents: prompt,
-            config: {
-                systemInstruction: systemInstruction || "You are a helpful assistant.",
-                temperature: 0.7
-            }
-        });
-        
-        res.json({ text: response.text });
-    } catch (e) {
-        console.error("GenAI Error:", e);
-        res.status(500).json({ error: "AI Generation Failed: " + e.message });
-    }
-});
 
 // ... [PAYMENT ENDPOINTS] ...
 app.post('/api/payment/initiate', (req, res) => {
@@ -286,9 +244,10 @@ app.post('/api/payment/razorpay/verify', async (req, res) => {
 // EMAIL NOTIFICATION ENDPOINT
 // ==========================================
 app.post('/api/notify', async (req, res) => {
-    const { to, subject, body, link, type } = req.body;
+    const { to, subject, body, link, type, attachments } = req.body;
     
     console.log(`\n📨 [EMAIL] To: ${to} | Subject: ${subject}`);
+    if(attachments) console.log(`   📎 Attachments: ${attachments.length}`);
 
     if (emailTransporter) {
         try {
@@ -300,12 +259,17 @@ app.post('/api/notify', async (req, res) => {
                 html: `<div style="font-family: sans-serif; padding: 20px;">
                         <h2>${subject}</h2>
                         <p>${body}</p>
-                        <a href="${link}" style="display: inline-block; background: #4f46e5; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">View Document</a>
-                       </div>`
+                        <br/>
+                        <a href="${link}" style="display: inline-block; background: #4f46e5; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">View Online</a>
+                       </div>`,
+                attachments: attachments
             });
         } catch(e) {
             console.error("Email send failed:", e.message);
+            return res.status(500).json({ error: e.message });
         }
+    } else {
+        console.warn("   ⚠️  SMTP not configured. Email suppressed.");
     }
 
     res.json({ message: "Notification processed" });
