@@ -6,10 +6,15 @@
  * 2. CCAvenue Payment Integration (AES-128-CBC)
  * 3. Razorpay Payment Integration
  * 4. Email Notifications (Nodemailer)
+ * 5. Gemini AI Integration (Text Generation)
  */
 
+// Load environment variables from .env file
+require('dotenv').config();
+
 // --- DEPENDENCY CHECK ---
-let express, cors, sql, bodyParser, qs, Razorpay, crypto, nodemailer;
+let express, cors, sql, bodyParser, qs, Razorpay, crypto, nodemailer, GoogleGenAI;
+
 try {
     express = require('express');
     cors = require('cors');
@@ -18,6 +23,17 @@ try {
     qs = require('querystring');
     crypto = require('crypto');
     
+    // Dynamic import for Gemini SDK (ESM)
+    (async () => {
+        try {
+            const genaiModule = await import("@google/genai");
+            GoogleGenAI = genaiModule.GoogleGenAI;
+            console.log("✨ GoogleGenAI SDK loaded");
+        } catch (e) {
+            console.warn("\x1b[33m%s\x1b[0m", "⚠️  '@google/genai' not found. AI features disabled.");
+        }
+    })();
+
     try {
         Razorpay = require('razorpay');
     } catch (e) {
@@ -41,14 +57,14 @@ try {
 }
 
 const app = express();
-const PORT = 3000;
+const PORT = process.env.PORT || 3000;
 
 app.use(cors());
 app.use(bodyParser.json({ limit: '10mb' }));
 app.use(bodyParser.urlencoded({ extended: true }));
 
 // --- SECURITY CONFIGURATION ---
-// STRICT: Do not fallback to hardcoded secrets in production code.
+// Credentials are now read exclusively from process.env (loaded via .env file)
 const ccavenueConfig = {
     workingKey: process.env.CCAV_WORKING_KEY || '', 
     merchantId: process.env.CCAV_MERCHANT_ID || '',
@@ -62,22 +78,21 @@ const razorpayConfig = {
 
 // Check for missing keys on startup
 if (!ccavenueConfig.workingKey && !razorpayConfig.key_id) {
-    console.warn("\x1b[33m%s\x1b[0m", "⚠️  Payment Gateway Keys missing in process.env. Payments will fail or run in simulation mode.");
+    console.warn("\x1b[33m%s\x1b[0m", "⚠️  Payment Gateway Keys missing in .env file. Payments will fail or run in simulation mode.");
 }
 
 // --- EMAIL CONFIGURATION ---
-const emailTransporter = nodemailer ? nodemailer.createTransport({
-    host: process.env.SMTP_HOST || "smtp.ethereal.email", 
+const emailTransporter = (nodemailer && process.env.SMTP_HOST) ? nodemailer.createTransport({
+    host: process.env.SMTP_HOST, 
     port: 587,
     secure: false, 
     auth: {
-        user: process.env.SMTP_USER || 'ethereal_user', 
-        pass: process.env.SMTP_PASS || 'ethereal_pass'
+        user: process.env.SMTP_USER, 
+        pass: process.env.SMTP_PASS
     }
 }) : null;
 
 // --- CCAVENUE CRYPTO UTILS (AES-128-CBC) ---
-// Re-implemented here to avoid dependency on 'NodeJS_Integration_Kit' folder
 const ccav = {
     encrypt: function (plainText, workingKey) {
         try {
@@ -111,13 +126,43 @@ const ccav = {
     }
 };
 
+// ==========================================
+// AI ENDPOINT
+// ==========================================
+app.post('/api/ai/generate', async (req, res) => {
+    if (!GoogleGenAI) return res.status(503).json({ error: "AI SDK not initialized on server." });
+    if (!process.env.API_KEY) return res.status(500).json({ error: "Server API_KEY not configured." });
+
+    const { prompt, systemInstruction } = req.body;
+
+    try {
+        // Initialize AI client with key from process.env
+        const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+        
+        // Use gemini-2.5-flash for fast text tasks
+        const response = await ai.models.generateContent({
+            model: 'gemini-2.5-flash',
+            contents: prompt,
+            config: {
+                systemInstruction: systemInstruction || "You are a helpful assistant.",
+                temperature: 0.7
+            }
+        });
+        
+        res.json({ text: response.text });
+    } catch (e) {
+        console.error("GenAI Error:", e);
+        res.status(500).json({ error: "AI Generation Failed: " + e.message });
+    }
+});
+
 // ... [PAYMENT ENDPOINTS] ...
 app.post('/api/payment/initiate', (req, res) => {
     const { order_id, amount, currency, billing_name, billing_address, email, billing_tel } = req.body;
     
     // Check if configuration exists
     if (!ccavenueConfig.workingKey || !ccavenueConfig.merchantId) {
-        return res.status(500).send("Server Error: CCAvenue credentials not configured.");
+        return res.status(500).send("Server Error: CCAvenue credentials not configured in .env file.");
     }
 
     const params = {
@@ -426,7 +471,7 @@ app.post('/api/invoices', async (req, res) => {
         res.status(200).json({ message: "Saved successfully" });
     } catch (err) {
         if (transaction._aborted === false) await transaction.rollback();
-        console.error("SQL Error:", err);
+        console.error("SQL Error during Save:", err);
         res.status(500).json({ error: err.message });
     }
 });

@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { InvoiceData, LineItem, PaymentStatus, Product, DocumentType } from '../types';
-import { PhotoIcon, PlusIcon, TrashIcon, DocumentTextIcon, ArrowPathIcon, ChevronLeftIcon, CheckCircleIcon, ChatBubbleLeftRightIcon, EyeIcon } from '@heroicons/react/24/outline';
+import { PhotoIcon, PlusIcon, TrashIcon, DocumentTextIcon, ArrowPathIcon, ChevronLeftIcon, CheckCircleIcon, ChatBubbleLeftRightIcon, EyeIcon, SparklesIcon } from '@heroicons/react/24/outline';
 import { InvoiceService } from '../services/invoiceService';
 import { ProductService } from '../services/productService';
 
@@ -24,7 +24,7 @@ const getInitialInvoice = (): InvoiceData => ({
   
   // Branding Defaults
   template: 'modern',
-  brandColor: '#4f46e5', // Indigo-600 default (Hidden from UI but used for Preview)
+  brandColor: '#4f46e5', // Indigo-600 default
   logoUrl: '',
 
   sellerName: 'John Doe',
@@ -68,6 +68,9 @@ const CreateInvoice: React.FC = () => {
   // Success Modal State
   const [showSuccessModal, setShowSuccessModal] = useState(false);
 
+  // AI Loading State: stores the ID of the field currently generating
+  const [generatingField, setGeneratingField] = useState<string | null>(null);
+
   // Load Invoice and Products
   useEffect(() => {
     const init = async () => {
@@ -83,12 +86,11 @@ const CreateInvoice: React.FC = () => {
             if (existingInvoice) {
               setInvoice({
                   ...existingInvoice,
-                  // Ensure backwards compatibility with missing fields
                   resourceSection: existingInvoice.resourceSection || '',
                   resourceName: existingInvoice.resourceName || '',
                   paymentGateway: existingInvoice.paymentGateway || '',
                   type: existingInvoice.type || 'INVOICE',
-                  template: 'modern' // Force Modern
+                  template: 'modern'
               });
               setIsEditMode(true);
             } else {
@@ -106,12 +108,55 @@ const CreateInvoice: React.FC = () => {
     init();
   }, [id, navigate]);
 
+  // --- AI GENERATION LOGIC ---
+  const generateAIContent = async (
+    targetField: 'notes' | string, // 'notes' or item ID
+    currentText: string,
+    type: 'DESCRIPTION' | 'NOTES'
+  ) => {
+    // If empty input, prompt user
+    if (!currentText || !currentText.trim()) {
+        const userInput = prompt(type === 'NOTES' ? "Enter key points for the invoice terms:" : "Enter product keywords (e.g., 'Web Design'):");
+        if (!userInput) return;
+        currentText = userInput;
+    }
+    
+    setGeneratingField(targetField);
+    try {
+        const systemInstruction = type === 'DESCRIPTION' 
+            ? "You are an invoice assistant. Expand the user's input into a professional, concise line item description (max 20 words)."
+            : "You are a professional business assistant. Write polite, clear invoice notes or terms and conditions based on the input.";
+            
+        const response = await fetch('/api/ai/generate', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ prompt: currentText, systemInstruction })
+        });
+        
+        const data = await response.json();
+        if (data.text) {
+            if (type === 'NOTES') {
+                handleChange('notes', data.text.trim());
+            } else {
+                // It's an item ID
+                handleItemChange(targetField, 'description', data.text.trim());
+            }
+        } else if (data.error) {
+            alert("AI Error: " + data.error);
+        }
+    } catch (e) {
+        console.error(e);
+        alert("Failed to connect to AI service. Check backend logs.");
+    } finally {
+        setGeneratingField(null);
+    }
+  };
+
   const handleChange = (section: keyof InvoiceData, value: any) => {
      setInvoice({ ...invoice, [section]: value });
   };
 
   const handlePhoneChange = (section: keyof InvoiceData, value: string) => {
-     // Allow only numbers, spaces, plus, and dashes
      const cleanValue = value.replace(/[^0-9+\-\s]/g, '');
      setInvoice({ ...invoice, [section]: cleanValue });
   };
@@ -138,8 +183,6 @@ const CreateInvoice: React.FC = () => {
     const newItems = invoice.items.map(item => {
       if (item.id === id) {
         const updated = { ...item, [field]: value };
-        // Calculate amount based on numeric values of quantity and rate
-        // We allow strings in state to support typing decimals like "10."
         const qty = parseFloat(updated.quantity.toString()) || 0;
         const rate = parseFloat(updated.rate.toString()) || 0;
         updated.amount = qty * rate;
@@ -152,19 +195,17 @@ const CreateInvoice: React.FC = () => {
     setInvoice({ ...invoice, items: newItems, ...totals });
   };
 
-  // Populate row from selected product Name
   const handleProductSelectByName = (itemId: string, productName: string) => {
     const product = products.find(p => p.name === productName);
     if (!product) return;
 
     const newItems = invoice.items.map(item => {
         if(item.id === itemId) {
-            // Ensure numeric quantity for calculation
             const qty = parseFloat(item.quantity.toString()) || 0;
             const updated = { 
                 ...item, 
                 name: product.name,
-                description: product.description.substring(0, 100), // Enforce limit on selection
+                description: product.description.substring(0, 100), 
                 rate: product.rate,
                 amount: qty * product.rate
             };
@@ -215,25 +256,21 @@ const CreateInvoice: React.FC = () => {
     
     const missingFields: string[] = [];
 
-    // 1. Basic Fields
     if (!invoice.invoiceNumber) missingFields.push("Reference Number");
     if (!invoice.date) missingFields.push("Date");
     if (docType === 'INVOICE' && !invoice.dueDate) missingFields.push("Due Date");
     if (!invoice.buyerName) missingFields.push("Client Name");
 
-    // 2. Email Validation
     if (invoice.buyerEmail && !isValidEmail(invoice.buyerEmail)) {
         missingFields.push("Valid Client Email Address");
     }
 
-    // 3. Payment Gateway (Only for Invoice)
     if (docType === 'INVOICE' && !invoice.paymentGateway) {
         missingFields.push("Payment Gateway");
     }
 
-    // 4. Item Validation
     let itemsValid = true;
-    invoice.items.forEach((item, index) => {
+    invoice.items.forEach((item) => {
         if (!item.name || item.name.trim() === '') {
             itemsValid = false;
         }
@@ -253,15 +290,11 @@ const CreateInvoice: React.FC = () => {
         const invoiceToSave: InvoiceData = { 
           ...invoice, 
           type: docType,
-          // If Quoting, set status to pending but won't be payable
           status: isEditMode ? invoice.status : PaymentStatus.PENDING 
         };
         
         await InvoiceService.saveInvoice(invoiceToSave);
-        
-        // Trigger Email Notification in background
         InvoiceService.sendEmailNotification(invoiceToSave, 'CREATED');
-
         setShowSuccessModal(true);
     } catch (error) {
         alert("Failed to save.");
@@ -273,17 +306,13 @@ const CreateInvoice: React.FC = () => {
 
   const handleWhatsAppRedirect = () => {
      if (!invoice.buyerPhone) return;
-
      const baseUrl = window.location.href.split('#')[0];
      const viewUrl = `${baseUrl}#/view/${invoice.id}`;
      const amount = new Intl.NumberFormat('en-IN', { style: 'currency', currency: invoice.currency }).format(invoice.total);
      const docType = invoice.type === 'QUOTATION' ? 'quotation' : 'invoice';
-     
      const message = `Hello ${invoice.buyerName}, here is your ${docType} from ${invoice.businessName} for ${amount}. View details here: ${viewUrl}`;
-     
      const cleanPhone = invoice.buyerPhone.replace(/[^0-9]/g, '');
      const whatsappUrl = `https://wa.me/${cleanPhone}?text=${encodeURIComponent(message)}`;
-     
      window.open(whatsappUrl, '_blank');
      navigate(`/view/${invoice.id}`);
   };
@@ -359,12 +388,10 @@ const CreateInvoice: React.FC = () => {
 
         <form className="space-y-6">
           
-          {/* Section 1: Payment Gateway (Formerly Branding & Template) */}
+          {/* Section 1: Payment Gateway */}
           <div className="bg-white shadow rounded-lg p-6">
             <h2 className="text-lg font-medium text-gray-900 mb-4 border-b pb-2">Configuration</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              
-              {/* Payment Gateway Selector */}
               <div className="col-span-1 md:col-span-2">
                  <label className="block text-sm font-medium text-gray-700 mb-2">Payment Gateway <span className="text-gray-400 font-normal">(Required for Invoices)</span></label>
                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -381,7 +408,7 @@ const CreateInvoice: React.FC = () => {
                         </div>
                         <div className="flex-1">
                            <span className="font-bold text-gray-900 block">CCAvenue</span>
-                           <span className="text-xs text-gray-500">Supports Netbanking, Cards, UPI (Popup Flow)</span>
+                           <span className="text-xs text-gray-500">Supports Netbanking, Cards, UPI</span>
                         </div>
                     </div>
 
@@ -398,7 +425,7 @@ const CreateInvoice: React.FC = () => {
                         </div>
                         <div className="flex-1">
                            <span className="font-bold text-gray-900 block">Razorpay</span>
-                           <span className="text-xs text-gray-500">Modern checkout, UPI, Cards (Modal Flow)</span>
+                           <span className="text-xs text-gray-500">Modern checkout, UPI, Cards</span>
                         </div>
                     </div>
                  </div>
@@ -445,7 +472,6 @@ const CreateInvoice: React.FC = () => {
               </div>
             </div>
 
-            {/* Resource Section (New) */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4 border-t border-gray-100 bg-gray-50 -mx-6 px-6 pb-2">
                 <div className="col-span-full">
                     <span className="text-xs font-bold text-gray-500 uppercase tracking-wide">Internal Resources (Not shown on document)</span>
@@ -475,7 +501,6 @@ const CreateInvoice: React.FC = () => {
 
           {/* Section 3: Seller & Buyer */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {/* Seller */}
             <div className="bg-white shadow rounded-lg p-6">
               <h2 className="text-lg font-medium text-gray-900 mb-4 border-b pb-2">From (Seller)</h2>
               <div className="space-y-4">
@@ -540,7 +565,6 @@ const CreateInvoice: React.FC = () => {
               </div>
             </div>
 
-            {/* Buyer */}
             <div className="bg-white shadow rounded-lg p-6">
               <h2 className="text-lg font-medium text-gray-900 mb-4 border-b pb-2">Bill To (Client)</h2>
               <div className="space-y-4">
@@ -576,7 +600,7 @@ const CreateInvoice: React.FC = () => {
             </div>
           </div>
 
-          {/* Section 4: Items (Responsive Redesign) */}
+          {/* Section 4: Items (With AI) */}
           <div className="bg-white shadow-lg rounded-xl overflow-hidden border border-gray-100">
             <div className="p-6 bg-gray-50 border-b border-gray-200 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                <div>
@@ -598,7 +622,6 @@ const CreateInvoice: React.FC = () => {
             </div>
 
             <div className="p-6">
-              {/* Desktop Header */}
               <div className="hidden md:grid grid-cols-[1fr_2fr_100px_120px_120px_50px] gap-4 mb-4 text-xs font-semibold text-gray-500 uppercase tracking-wider px-2">
                 <div>Item</div>
                 <div>Description</div>
@@ -612,7 +635,7 @@ const CreateInvoice: React.FC = () => {
                 {invoice.items.map((item, index) => (
                   <div key={item.id} className="group relative">
                     
-                    {/* Mobile Card View */}
+                    {/* Mobile View */}
                     <div className="md:hidden bg-white border border-gray-200 rounded-xl p-4 shadow-sm hover:shadow-md transition-shadow relative">
                         <button
                             type="button"
@@ -637,7 +660,21 @@ const CreateInvoice: React.FC = () => {
                         </div>
 
                         <div className="mb-4">
-                            <label className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-1 block">Description</label>
+                            <label className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-1 block flex justify-between">
+                                <span>Description</span>
+                                <button
+                                    type="button"
+                                    onClick={() => generateAIContent(item.id, item.description, 'DESCRIPTION')}
+                                    className="text-indigo-600 flex items-center gap-1 text-[10px] bg-indigo-50 px-2 py-0.5 rounded-full hover:bg-indigo-100"
+                                >
+                                    {generatingField === item.id ? (
+                                        <div className="w-3 h-3 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin" />
+                                    ) : (
+                                        <SparklesIcon className="w-3 h-3" />
+                                    )}
+                                    AI Enhance
+                                </button>
+                            </label>
                             <textarea
                                 rows={2}
                                 className="w-full border-gray-300 rounded-lg shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm p-2 resize-none"
@@ -646,7 +683,6 @@ const CreateInvoice: React.FC = () => {
                                 onChange={(e) => handleItemChange(item.id, 'description', e.target.value)}
                                 maxLength={100}
                             />
-                            <div className="text-[10px] text-gray-400 text-right mt-1">{item.description.length}/100</div>
                         </div>
 
                         <div className="grid grid-cols-2 gap-4 mb-4">
@@ -673,19 +709,11 @@ const CreateInvoice: React.FC = () => {
                                 />
                             </div>
                         </div>
-
-                        <div className="flex justify-between items-center pt-4 border-t border-gray-100 bg-gray-50 -mx-4 -mb-4 px-4 py-3 rounded-b-xl">
-                            <span className="text-sm font-medium text-gray-500">Total Amount</span>
-                            <span className="text-lg font-bold text-gray-900">
-                                {new Intl.NumberFormat('en-IN', { style: 'currency', currency: invoice.currency }).format(item.amount)}
-                            </span>
-                        </div>
                     </div>
 
-                    {/* Desktop Row View */}
+                    {/* Desktop View */}
                     <div className="hidden md:grid grid-cols-[1fr_2fr_100px_120px_120px_50px] gap-4 items-start bg-white border border-gray-200 rounded-lg p-3 hover:border-indigo-300 transition-colors shadow-sm">
                         
-                        {/* Name */}
                         <div>
                             <select
                                 className="w-full border-gray-300 rounded-md text-sm focus:ring-indigo-500 focus:border-indigo-500 py-2 px-3 bg-gray-50 focus:bg-white transition-colors"
@@ -699,20 +727,29 @@ const CreateInvoice: React.FC = () => {
                             </select>
                         </div>
 
-                        {/* Description */}
-                        <div>
+                        <div className="relative">
                             <input
                                 type="text"
-                                className="w-full border-gray-300 rounded-md text-sm focus:ring-indigo-500 focus:border-indigo-500 py-2 px-3 bg-gray-50 focus:bg-white transition-colors"
+                                className="w-full border-gray-300 rounded-md text-sm focus:ring-indigo-500 focus:border-indigo-500 py-2 pl-3 pr-8 bg-gray-50 focus:bg-white transition-colors"
                                 placeholder="Description"
                                 value={item.description}
                                 onChange={(e) => handleItemChange(item.id, 'description', e.target.value)}
                                 maxLength={100}
                             />
-                            <div className="text-[10px] text-gray-400 text-right mt-1">{item.description.length}/100</div>
+                            <button
+                                type="button"
+                                onClick={() => generateAIContent(item.id, item.description, 'DESCRIPTION')}
+                                className="absolute right-2 top-1/2 -translate-y-1/2 text-indigo-400 hover:text-indigo-600 transition-colors"
+                                title="Enhance with AI"
+                            >
+                                {generatingField === item.id ? (
+                                    <div className="w-4 h-4 border-2 border-indigo-400 border-t-transparent rounded-full animate-spin" />
+                                ) : (
+                                    <SparklesIcon className="w-4 h-4" />
+                                )}
+                            </button>
                         </div>
 
-                        {/* Qty */}
                         <div>
                             <input
                                 type="number"
@@ -724,7 +761,6 @@ const CreateInvoice: React.FC = () => {
                             />
                         </div>
 
-                        {/* Rate */}
                         <div>
                             <div className="relative">
                                 <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs">
@@ -741,12 +777,10 @@ const CreateInvoice: React.FC = () => {
                             </div>
                         </div>
 
-                        {/* Amount */}
                         <div className="py-2 text-right font-bold text-gray-900">
                             {new Intl.NumberFormat('en-IN', { style: 'currency', currency: invoice.currency }).format(item.amount)}
                         </div>
 
-                        {/* Delete */}
                         <div className="flex justify-center pt-1">
                             <button
                                 type="button"
@@ -820,9 +854,23 @@ const CreateInvoice: React.FC = () => {
             </div>
           </div>
 
-           {/* Section 5: Notes */}
+           {/* Section 5: Notes (With AI) */}
            <div className="bg-white shadow rounded-lg p-6">
-              <h2 className="text-lg font-medium text-gray-900 mb-4 border-b pb-2">Additional Notes</h2>
+              <div className="flex justify-between items-center mb-4 border-b pb-2">
+                  <h2 className="text-lg font-medium text-gray-900">Additional Notes</h2>
+                  <button
+                    type="button"
+                    onClick={() => generateAIContent('notes', invoice.notes || '', 'NOTES')}
+                    className="text-indigo-600 hover:text-indigo-800 text-xs font-medium flex items-center gap-1 bg-indigo-50 px-2 py-1 rounded-full transition-colors"
+                  >
+                    {generatingField === 'notes' ? (
+                        <div className="w-3 h-3 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin" />
+                    ) : (
+                        <SparklesIcon className="w-3 h-3" />
+                    )}
+                    Generate Professional Terms
+                  </button>
+              </div>
               <textarea
                 rows={4}
                 className="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm border p-2"
@@ -844,7 +892,6 @@ const CreateInvoice: React.FC = () => {
               </button>
             )}
             
-            {/* Generate Quotation Button */}
             <button
                 type="button"
                 onClick={(e) => handleSubmit(e, 'QUOTATION')}
@@ -854,7 +901,6 @@ const CreateInvoice: React.FC = () => {
                 {isSaving ? 'Processing...' : isEditMode && invoice.type === 'QUOTATION' ? 'Update Quotation' : 'Generate Quotation'}
             </button>
 
-            {/* Generate Invoice Button */}
             <button
               type="button"
               onClick={(e) => handleSubmit(e, 'INVOICE')}

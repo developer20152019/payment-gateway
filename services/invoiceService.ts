@@ -50,7 +50,10 @@ export const InvoiceService = {
         body: JSON.stringify(invoice)
       });
       // If server returns 503 (DB down) or other error, throw to trigger catch
-      if (!response.ok) throw new Error(`Backend Error: ${response.statusText}`);
+      if (!response.ok) {
+          const errText = await response.text();
+          throw new Error(`Backend Error: ${response.status} ${errText}`);
+      }
     } catch (e) {
       console.warn("⚠️ Backend unavailable. Saving to LocalStorage instead.", e);
       return LocalStorageService.saveInvoice(invoice);
@@ -104,14 +107,19 @@ export const InvoiceService = {
             invoice.paymentGateway = gateway;
         }
         // 2. Update backend
-        await fetch(`${API_BASE}/invoices`, {
+        const saveResponse = await fetch(`${API_BASE}/invoices`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(invoice)
         });
+
+        if (!saveResponse.ok) {
+            const errText = await saveResponse.text();
+            throw new Error(`Backend save failed: ${saveResponse.status} ${errText}`);
+        }
         return;
       }
-      throw new Error("Backend update failed");
+      throw new Error("Backend fetch failed");
     } catch (e) {
       // 3. Fallback: Update LocalStorage
       console.warn("⚠️ Backend unavailable. Updating status locally.", e);
