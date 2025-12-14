@@ -203,7 +203,7 @@ const mapToInvoice = (record, items = []) => ({
     taxAmount: record.TaxAmount,
     total: record.Total,
     currency: record.Currency,
-    status: record.Status,
+    status: record.Status || 'PENDING',
     paymentGateway: record.PaymentGateway || '',
     notes: record.Notes,
     items: items
@@ -252,7 +252,7 @@ app.post('/api/invoices', async (req, res) => {
         // Bind Inputs
         request.input('id', sql.NVarChar, invoice.id);
         request.input('invNum', sql.NVarChar, invoice.invoiceNumber);
-        request.input('type', sql.NVarChar, invoice.type || 'INVOICE'); // New Field
+        request.input('type', sql.NVarChar, invoice.type || 'INVOICE');
         request.input('date', sql.Date, invoice.date);
         request.input('dueDate', sql.Date, invoice.dueDate);
         request.input('template', sql.NVarChar, invoice.template);
@@ -270,18 +270,15 @@ app.post('/api/invoices', async (req, res) => {
         request.input('buyAddr', sql.NVarChar, invoice.buyerAddress);
         request.input('resSec', sql.NVarChar, invoice.resourceSection || '');
         request.input('resName', sql.NVarChar, invoice.resourceName || '');
-        request.input('sub', sql.Decimal(18,2), invoice.subtotal);
-        request.input('taxRate', sql.Decimal(5,2), invoice.taxRate);
-        request.input('taxAmt', sql.Decimal(18,2), invoice.taxAmount);
-        request.input('total', sql.Decimal(18,2), invoice.total);
+        request.input('sub', sql.Decimal(18,2), invoice.subtotal || 0);
+        request.input('taxRate', sql.Decimal(5,2), invoice.taxRate || 0);
+        request.input('taxAmt', sql.Decimal(18,2), invoice.taxAmount || 0);
+        request.input('total', sql.Decimal(18,2), invoice.total || 0);
         request.input('curr', sql.NVarChar, invoice.currency);
-        request.input('status', sql.NVarChar, invoice.status);
+        request.input('status', sql.NVarChar, invoice.status || 'PENDING');
         request.input('pg', sql.NVarChar, invoice.paymentGateway || '');
         request.input('notes', sql.NVarChar, invoice.notes || '');
 
-        // Note: For existing DBs without 'Type' or 'ItemName' columns, this might fail unless schema is updated.
-        // In a real app, use migration scripts. Here we assume table has these columns.
-        
         const check = await request.query(`SELECT ID FROM Invoices WHERE ID = @id`);
         
         if (check.recordset.length > 0) {
@@ -314,12 +311,12 @@ app.post('/api/invoices', async (req, res) => {
             const itemReq = new sql.Request(transaction);
             itemReq.input('i_id', sql.NVarChar, item.id);
             itemReq.input('inv_id', sql.NVarChar, invoice.id);
-            itemReq.input('name', sql.NVarChar, item.name || ''); // New Column
+            itemReq.input('name', sql.NVarChar, item.name || ''); 
             itemReq.input('desc', sql.NVarChar, item.description);
-            // Changed from sql.Int to sql.Decimal to support fractional quantities (e.g. 1.5 hours)
-            itemReq.input('qty', sql.Decimal(18,2), item.quantity); 
-            itemReq.input('rate', sql.Decimal(18,2), item.rate);
-            itemReq.input('amt', sql.Decimal(18,2), item.amount);
+            // Ensure numeric defaults to prevent SQL errors on empty strings
+            itemReq.input('qty', sql.Decimal(18,2), item.quantity || 0); 
+            itemReq.input('rate', sql.Decimal(18,2), item.rate || 0);
+            itemReq.input('amt', sql.Decimal(18,2), item.amount || 0);
             
             await itemReq.query(`INSERT INTO LineItems (ID, InvoiceID, ItemName, Description, Quantity, Rate, Amount) VALUES (@i_id, @inv_id, @name, @desc, @qty, @rate, @amt)`);
         }
