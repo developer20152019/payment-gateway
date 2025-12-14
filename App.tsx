@@ -3,6 +3,7 @@ import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';
 import CreateInvoice from './pages/CreateInvoice';
 import ViewInvoice from './pages/ViewInvoice';
 import Dashboard from './pages/Dashboard';
+import Products from './pages/Products';
 
 const App: React.FC = () => {
   return (
@@ -24,6 +25,10 @@ const App: React.FC = () => {
           <Route 
             path="/view/:id" 
             element={<ViewInvoice />} 
+          />
+          <Route
+            path="/products"
+            element={<Products />}
           />
           <Route path="*" element={<Navigate to="/" />} />
         </Routes>

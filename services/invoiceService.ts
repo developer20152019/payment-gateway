@@ -1,4 +1,4 @@
-import { InvoiceData, PaymentStatus } from '../types';
+import { InvoiceData, PaymentStatus, PaymentGateway } from '../types';
 
 const API_BASE = 'http://localhost:3000/api';
 const LOCAL_STORAGE_KEY = 'paylink_invoices';
@@ -93,13 +93,16 @@ export const InvoiceService = {
     }
   },
 
-  updateStatus: async (id: string, status: PaymentStatus): Promise<void> => {
+  updateStatus: async (id: string, status: PaymentStatus, gateway?: PaymentGateway): Promise<void> => {
     try {
-      // 1. Try to fetch current state from backend
-      const response = await fetch(`${API_BASE}/invoices/${id}`);
+      // 1. Try to fetch current state from backend (Force fresh fetch with timestamp)
+      const response = await fetch(`${API_BASE}/invoices/${id}?_t=${Date.now()}`);
       if (response.ok) {
         const invoice: InvoiceData = await response.json();
         invoice.status = status;
+        if (gateway) {
+            invoice.paymentGateway = gateway;
+        }
         // 2. Update backend
         await fetch(`${API_BASE}/invoices`, {
           method: 'POST',
@@ -116,8 +119,34 @@ export const InvoiceService = {
       const index = invoices.findIndex(i => i.id === id);
       if (index >= 0) {
         invoices[index].status = status;
+        if (gateway) {
+            invoices[index].paymentGateway = gateway;
+        }
         LocalStorageService.save(invoices);
       }
+    }
+  },
+
+  // --- Notification ---
+  sendEmailNotification: async (invoice: InvoiceData, type: 'CREATED' | 'PAID') => {
+    try {
+        const link = `${window.location.origin}${window.location.pathname}#/view/${invoice.id}`;
+        await fetch(`${API_BASE}/notify`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                to: invoice.buyerEmail,
+                subject: type === 'PAID' 
+                    ? `Receipt for Invoice #${invoice.invoiceNumber}` 
+                    : `${invoice.type === 'QUOTATION' ? 'Quotation' : 'Invoice'} #${invoice.invoiceNumber} from ${invoice.businessName}`,
+                body: `Please find the link to your ${invoice.type.toLowerCase()} below.`,
+                link: link,
+                type: type
+            })
+        });
+        console.log("Email request sent to backend");
+    } catch (e) {
+        console.warn("Failed to send email notification", e);
     }
   },
 

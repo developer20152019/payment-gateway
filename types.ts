@@ -1,3 +1,4 @@
+
 export enum PaymentStatus {
   PENDING = 'PENDING',
   PAID = 'PAID',
@@ -6,19 +7,29 @@ export enum PaymentStatus {
 }
 
 export type InvoiceTemplate = 'modern' | 'classic' | 'minimal';
-export type PaymentGateway = 'CCAvenue' | 'Razorpay';
+export type PaymentGateway = 'CCAvenue' | 'Razorpay' | 'CASH' | '';
+export type DocumentType = 'INVOICE' | 'QUOTATION';
+
+export interface Product {
+  id: string;
+  name: string;
+  description: string;
+  rate: number;
+}
 
 export interface LineItem {
   id: string;
+  name: string; 
   description: string;
-  quantity: number;
-  rate: number;
+  quantity: number | string; // Changed to allow intermediate input states
+  rate: number | string;     // Changed to allow intermediate input states (e.g. "10.")
   amount: number;
 }
 
 export interface InvoiceData {
   id: string;
   invoiceNumber: string;
+  type: DocumentType; 
   date: string;
   dueDate: string;
   
@@ -41,6 +52,10 @@ export interface InvoiceData {
   buyerPhone: string;
   buyerAddress: string;
 
+  // Internal Resource Info (Not shown on Invoice)
+  resourceSection?: string;
+  resourceName?: string;
+
   // Financials
   items: LineItem[];
   subtotal: number;
@@ -50,7 +65,7 @@ export interface InvoiceData {
   currency: string;
 
   status: PaymentStatus;
-  paymentGateway: PaymentGateway; // New Field
+  paymentGateway: PaymentGateway; 
   notes?: string;
 }
 

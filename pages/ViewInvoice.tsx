@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { InvoiceData, PaymentStatus } from '../types';
 import { InvoicePreview } from '../components/InvoicePreview';
-import { ShieldCheckIcon, ShareIcon, PrinterIcon, ArrowDownTrayIcon, PaperAirplaneIcon, CheckCircleIcon, XCircleIcon } from '@heroicons/react/24/outline';
+import { ShieldCheckIcon, ShareIcon, PrinterIcon, ArrowDownTrayIcon, CheckCircleIcon, XCircleIcon } from '@heroicons/react/24/outline';
 import { InvoiceService } from '../services/invoiceService';
 
 const ViewInvoice: React.FC = () => {
@@ -23,12 +23,12 @@ const ViewInvoice: React.FC = () => {
          if (data) {
            setInvoice(data);
          } else {
-           alert("Invoice not found");
+           alert("Document not found");
            navigate('/');
          }
       } catch(e) {
          console.error(e);
-         alert("Error loading invoice");
+         alert("Error loading document");
       }
     }
   }, [id, navigate]);
@@ -194,7 +194,10 @@ const ViewInvoice: React.FC = () => {
     // Note: Razorpay backend verify already updates DB, but this ensures LocalStorage sync
     await InvoiceService.updateStatus(invoice.id, PaymentStatus.PAID);
 
-    // 3. Background Sync
+    // 3. Send Email Notification with updated link
+    InvoiceService.sendEmailNotification(updatedInvoice, 'PAID');
+
+    // 4. Background Sync
     setTimeout(() => fetchInvoice(), 1000);
   };
 
@@ -240,12 +243,13 @@ const ViewInvoice: React.FC = () => {
 
   if (!invoice) return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50">
-       <div className="text-center text-gray-500 font-medium">Loading Invoice...</div>
+       <div className="text-center text-gray-500 font-medium">Loading Document...</div>
     </div>
   );
 
   // Helper boolean for UI logic
   const isPaid = invoice.status === PaymentStatus.PAID;
+  const isQuotation = invoice.type === 'QUOTATION';
 
   return (
     <div className="min-h-screen pb-24 md:pb-20 bg-gray-50">
@@ -269,7 +273,7 @@ const ViewInvoice: React.FC = () => {
              <span className="bg-indigo-600 text-white w-8 h-8 flex items-center justify-center rounded-lg">P</span>
              PayLink
           </div>
-          <div className="flex gap-2">
+          <div className="flex gap-2 items-center">
              <button 
               onClick={handleDownloadPdf} 
               disabled={isDownloading}
@@ -301,100 +305,103 @@ const ViewInvoice: React.FC = () => {
           </div>
 
           {/* Right: Payment Sidebar (Desktop) */}
-          <div className="hidden md:block w-80 shrink-0 space-y-6 no-print">
-             <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 sticky top-24">
-                <h3 className="font-bold text-gray-900 mb-6 text-lg">Payment Status</h3>
-                
-                <div className="flex justify-between items-center mb-6 pb-6 border-b border-gray-100">
-                  <span className="text-gray-500 font-medium">Total Amount</span>
-                  <span className="text-3xl font-bold text-gray-900 tracking-tight">
-                    {new Intl.NumberFormat('en-IN', { style: 'currency', currency: invoice.currency }).format(invoice.total)}
-                  </span>
-                </div>
-
-                {/* --- UI LOGIC: HIDE BUTTON IF PAID --- */}
-                {isPaid ? (
-                  <div className="w-full bg-green-50 text-green-700 py-6 rounded-xl border border-green-200 flex flex-col items-center justify-center gap-2 animate-fade-in">
-                    <div className="p-3 bg-green-100 rounded-full">
-                        <CheckCircleIcon className="w-8 h-8 text-green-600" />
-                    </div>
-                    <span className="font-bold text-lg">Payment Complete</span>
-                    <span className="text-xs text-green-600 opacity-80">Transaction verified</span>
-                  </div>
-                ) : (
-                  <>
-                    <button 
-                      onClick={handlePayNow}
-                      disabled={isLoading}
-                      className={`w-full py-4 rounded-xl font-bold text-lg flex items-center justify-center gap-2 transition-all shadow-lg hover:shadow-xl ${
-                         invoice.status === PaymentStatus.FAILED 
-                         ? 'bg-red-600 hover:bg-red-700 text-white shadow-red-200'
-                         : invoice.paymentGateway === 'Razorpay' 
-                            ? 'bg-blue-600 hover:bg-blue-700 text-white shadow-blue-200' 
-                            : 'bg-indigo-600 hover:bg-indigo-700 text-white shadow-indigo-200'
-                      }`}
-                    >
-                      {isLoading ? (
-                        <>
-                          <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
-                          <span>Processing...</span>
-                        </>
-                      ) : (
-                        <>
-                          <ShieldCheckIcon className="w-5 h-5" />
-                          <span>{invoice.status === PaymentStatus.FAILED ? 'Retry Payment' : 'Pay Now'}</span>
-                        </>
-                      )}
-                    </button>
+          {/* ONLY SHOW IF INVOICE (Not Quotation) */}
+          {!isQuotation && (
+            <div className="hidden md:block w-80 shrink-0 space-y-6 no-print">
+                <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 sticky top-24">
+                    <h3 className="font-bold text-gray-900 mb-6 text-lg">Payment Status</h3>
                     
-                    <p className="text-xs text-gray-400 text-center mt-2">
-                        Method: <span className="font-semibold">{invoice.paymentGateway}</span>
-                    </p>
+                    <div className="flex justify-between items-center mb-6 pb-6 border-b border-gray-100">
+                    <span className="text-gray-500 font-medium">Total Amount</span>
+                    <span className="text-3xl font-bold text-gray-900 tracking-tight">
+                        {new Intl.NumberFormat('en-IN', { style: 'currency', currency: invoice.currency }).format(invoice.total)}
+                    </span>
+                    </div>
 
-                    {invoice.status === PaymentStatus.FAILED && (
-                        <div className="bg-red-50 text-red-600 text-xs p-3 rounded-lg text-center border border-red-100 mt-2">
-                           Previous transaction failed. Please try again.
+                    {/* --- UI LOGIC: HIDE BUTTON IF PAID --- */}
+                    {isPaid ? (
+                    <div className="w-full bg-green-50 text-green-700 py-6 rounded-xl border border-green-200 flex flex-col items-center justify-center gap-2 animate-fade-in">
+                        <div className="p-3 bg-green-100 rounded-full">
+                            <CheckCircleIcon className="w-8 h-8 text-green-600" />
                         </div>
-                    )}
-                  </>
-                )}
+                        <span className="font-bold text-lg">Payment Complete</span>
+                        <span className="text-xs text-green-600 opacity-80">Transaction verified</span>
+                    </div>
+                    ) : (
+                    <>
+                        <button 
+                        onClick={handlePayNow}
+                        disabled={isLoading}
+                        className={`w-full py-4 rounded-xl font-bold text-lg flex items-center justify-center gap-2 transition-all shadow-lg hover:shadow-xl ${
+                            invoice.status === PaymentStatus.FAILED 
+                            ? 'bg-red-600 hover:bg-red-700 text-white shadow-red-200'
+                            : invoice.paymentGateway === 'Razorpay' 
+                                ? 'bg-blue-600 hover:bg-blue-700 text-white shadow-blue-200' 
+                                : 'bg-indigo-600 hover:bg-indigo-700 text-white shadow-indigo-200'
+                        }`}
+                        >
+                        {isLoading ? (
+                            <>
+                            <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                            <span>Processing...</span>
+                            </>
+                        ) : (
+                            <>
+                            <ShieldCheckIcon className="w-5 h-5" />
+                            <span>{invoice.status === PaymentStatus.FAILED ? 'Retry Payment' : 'Pay Now'}</span>
+                            </>
+                        )}
+                        </button>
 
-                <div className="mt-6 flex items-center justify-center gap-2 text-[10px] uppercase tracking-wider text-gray-400 font-semibold">
-                  <ShieldCheckIcon className="w-3 h-3" />
-                  Secured by {invoice.paymentGateway}
+                        {invoice.status === PaymentStatus.FAILED && (
+                            <div className="bg-red-50 text-red-600 text-xs p-3 rounded-lg text-center border border-red-100 mt-2">
+                            Previous transaction failed. Please try again.
+                            </div>
+                        )}
+                    </>
+                    )}
+
+                    <div className="mt-6 flex items-center justify-center gap-2 text-[10px] uppercase tracking-wider text-gray-400 font-semibold">
+                    <ShieldCheckIcon className="w-3 h-3" />
+                    Secured by {invoice.paymentGateway}
+                    </div>
                 </div>
-             </div>
-          </div>
+            </div>
+          )}
       </div>
 
       {/* Mobile Sticky Footer */}
-      <div className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 p-4 z-40 shadow-[0_-4px_20px_rgba(0,0,0,0.05)] flex items-center justify-between no-print">
-         <div>
-            <p className="text-xs text-gray-500 font-medium uppercase tracking-wide">Total Due</p>
-            <p className="text-xl font-bold text-gray-900 leading-none mt-1">
-              {new Intl.NumberFormat('en-IN', { style: 'currency', currency: invoice.currency }).format(invoice.total)}
-            </p>
-         </div>
-         
-         {isPaid ? (
-            <div className="bg-green-100 text-green-800 px-5 py-2.5 rounded-lg font-bold text-sm flex items-center gap-2 border border-green-200">
-               <CheckCircleIcon className="w-5 h-5"/> Paid
+      {!isQuotation && (
+        <div className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 p-4 z-40 shadow-[0_-4px_20px_rgba(0,0,0,0.05)] flex items-center justify-between no-print">
+            <div>
+                <p className="text-xs text-gray-500 font-medium uppercase tracking-wide">Total Due</p>
+                <p className="text-xl font-bold text-gray-900 leading-none mt-1">
+                {new Intl.NumberFormat('en-IN', { style: 'currency', currency: invoice.currency }).format(invoice.total)}
+                </p>
             </div>
-         ) : (
-            <button 
-               onClick={handlePayNow}
-               className={`px-6 py-3 rounded-lg font-bold text-sm shadow-md flex items-center gap-2 text-white ${
-                  invoice.status === PaymentStatus.FAILED 
-                  ? 'bg-red-600' 
-                  : invoice.paymentGateway === 'Razorpay' 
-                    ? 'bg-blue-600' 
-                    : 'bg-indigo-600'
-               }`}
-            >
-              {invoice.status === PaymentStatus.FAILED ? 'Retry' : 'Pay Now'} <ShieldCheckIcon className="w-4 h-4" />
-            </button>
-         )}
-      </div>
+            
+            {isPaid ? (
+                <div className="bg-green-100 text-green-800 px-5 py-2.5 rounded-lg font-bold text-sm flex items-center gap-2 border border-green-200">
+                <CheckCircleIcon className="w-5 h-5"/> Paid
+                </div>
+            ) : (
+                <div className="flex gap-2">
+                    <button 
+                    onClick={handlePayNow}
+                    className={`px-6 py-3 rounded-lg font-bold text-sm shadow-md flex items-center gap-2 text-white ${
+                        invoice.status === PaymentStatus.FAILED 
+                        ? 'bg-red-600' 
+                        : invoice.paymentGateway === 'Razorpay' 
+                            ? 'bg-blue-600' 
+                            : 'bg-indigo-600'
+                    }`}
+                    >
+                    {invoice.status === PaymentStatus.FAILED ? 'Retry' : 'Pay Now'} <ShieldCheckIcon className="w-4 h-4" />
+                    </button>
+                </div>
+            )}
+        </div>
+      )}
     </div>
   );
 };

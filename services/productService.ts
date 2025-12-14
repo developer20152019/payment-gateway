@@ -1,0 +1,71 @@
+import { Product } from '../types';
+
+const API_BASE = 'http://localhost:3000/api';
+const LOCAL_STORAGE_KEY = 'paylink_products';
+
+const LocalStorageProductService = {
+  getAll: (): Product[] => {
+    try {
+      const data = localStorage.getItem(LOCAL_STORAGE_KEY);
+      return data ? JSON.parse(data) : [];
+    } catch {
+      return [];
+    }
+  },
+  save: (products: Product[]) => {
+    localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(products));
+  },
+  saveProduct: async (product: Product): Promise<void> => {
+    const products = LocalStorageProductService.getAll();
+    const index = products.findIndex(p => p.id === product.id);
+    if (index >= 0) {
+      products[index] = product; // Update existing
+    } else {
+      products.push(product); // Insert new
+    }
+    LocalStorageProductService.save(products);
+  },
+  deleteProduct: async (id: string): Promise<void> => {
+    const products = LocalStorageProductService.getAll().filter(p => p.id !== id);
+    LocalStorageProductService.save(products);
+  }
+};
+
+export const ProductService = {
+  getAllProducts: async (): Promise<Product[]> => {
+    try {
+      const response = await fetch(`${API_BASE}/products?_t=${Date.now()}`);
+      if (!response.ok) throw new Error("Failed to load products");
+      return await response.json();
+    } catch (e) {
+      console.warn("⚠️ Backend unavailable. Loading Products from LocalStorage.", e);
+      return LocalStorageProductService.getAll();
+    }
+  },
+
+  saveProduct: async (product: Product): Promise<void> => {
+    try {
+      const response = await fetch(`${API_BASE}/products`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(product)
+      });
+      if (!response.ok) throw new Error("Backend Error");
+    } catch (e) {
+      console.warn("⚠️ Backend unavailable. Saving Product to LocalStorage.", e);
+      return LocalStorageProductService.saveProduct(product);
+    }
+  },
+
+  deleteProduct: async (id: string): Promise<void> => {
+    try {
+      const response = await fetch(`${API_BASE}/products/${id}`, {
+        method: 'DELETE'
+      });
+      if (!response.ok) throw new Error("Failed to delete product");
+    } catch (e) {
+      console.warn("⚠️ Backend unavailable. Deleting Product from LocalStorage.", e);
+      return LocalStorageProductService.deleteProduct(id);
+    }
+  }
+};
