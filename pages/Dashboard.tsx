@@ -50,10 +50,51 @@ const Dashboard: React.FC = () => {
     e.stopPropagation();
     const url = `${window.location.origin}${window.location.pathname}#/view/${id}`;
     
-    navigator.clipboard.writeText(url).then(() => {
-      setCopiedId(id);
-      setTimeout(() => setCopiedId(null), 2000);
-    });
+    // Robust Copy Function with Fallback
+    const copyToClipboard = (text: string) => {
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(text).then(() => {
+                setCopiedId(id);
+                setTimeout(() => setCopiedId(null), 2000);
+            }).catch(err => {
+                console.error("Clipboard API failed, trying fallback", err);
+                fallbackCopy(text);
+            });
+        } else {
+            fallbackCopy(text);
+        }
+    };
+
+    const fallbackCopy = (text: string) => {
+        try {
+            const textArea = document.createElement("textarea");
+            textArea.value = text;
+            
+            // Ensure it's not visible but part of DOM to be selectable
+            textArea.style.position = "fixed";
+            textArea.style.left = "-9999px";
+            textArea.style.top = "0";
+            
+            document.body.appendChild(textArea);
+            textArea.focus();
+            textArea.select();
+            
+            const successful = document.execCommand('copy');
+            document.body.removeChild(textArea);
+            
+            if (successful) {
+                setCopiedId(id);
+                setTimeout(() => setCopiedId(null), 2000);
+            } else {
+                window.prompt("Copy this link:", text);
+            }
+        } catch (err) {
+            console.error("Fallback copy failed", err);
+            window.prompt("Copy this link:", text);
+        }
+    };
+
+    copyToClipboard(url);
   };
 
   const handleEdit = (e: React.MouseEvent, id: string) => {

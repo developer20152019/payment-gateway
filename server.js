@@ -54,8 +54,9 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 app.use(cors());
-app.use(bodyParser.json({ limit: '10mb' })); // Increased limit for PDF attachments
-app.use(bodyParser.urlencoded({ extended: true }));
+// Increased limit to 50mb to handle large PDF attachments via Email
+app.use(bodyParser.json({ limit: '50mb' })); 
+app.use(bodyParser.urlencoded({ extended: true, limit: '50mb' }));
 
 // --- SECURITY CONFIGURATION ---
 // Credentials are now read exclusively from process.env (loaded via .env file)
@@ -279,17 +280,28 @@ app.post('/api/notify', async (req, res) => {
 // SQL DATABASE ENDPOINTS
 // ==========================================
 
+// Use environment variables for SQL connection if available
 const sqlConfig = {
-    database: 'PayLinkDB',
-    server: '(localdb)\\MSSQLLocalDB', 
-    pool: { max: 10, min: 0, idleTimeoutMillis: 30000 },
-    options: { encrypt: true, trustServerCertificate: true }
+  user: process.env.DB_USER,
+  password: process.env.DB_PASSWORD,
+  database: process.env.DB_NAME || 'PayLinkDB',
+  server: process.env.DB_SERVER || '(localdb)\\MSSQLLocalDB',
+  port: process.env.DB_PORT ? Number(process.env.DB_PORT) : undefined,
+  pool: {
+    max: 10,
+    min: 0,
+    idleTimeoutMillis: 30000
+  },
+  options: {
+    encrypt: true, // Use true for Azure/LocalDB usually, unless self-hosted without SSL
+    trustServerCertificate: true
+  }
 };
 
 sql.connect(sqlConfig).then(() => {
     console.log("✅ Connected to SQL Server");
 }).catch(err => {
-    console.log("⚠️ SQL Server Connection Failed. Running in Offline Mode.");
+    console.log("⚠️ SQL Server Connection Failed. Running in Offline Mode.", err.message);
 });
 
 // --- HELPER MAPPERS ---

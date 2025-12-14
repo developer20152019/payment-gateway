@@ -1,6 +1,7 @@
 import { Product } from '../types';
 
-const API_BASE = 'http://localhost:3000/api';
+// Use relative path to leverage Vite proxy (fixes mobile/network access)
+const API_BASE = '/api';
 const LOCAL_STORAGE_KEY = 'paylink_products';
 
 const LocalStorageProductService = {

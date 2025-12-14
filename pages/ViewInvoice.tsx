@@ -2,8 +2,13 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { InvoiceData, PaymentStatus } from '../types';
 import { InvoicePreview } from '../components/InvoicePreview';
-import { ShieldCheckIcon, ShareIcon, PrinterIcon, ArrowDownTrayIcon, CheckCircleIcon, XCircleIcon, EnvelopeIcon } from '@heroicons/react/24/outline';
+import { ShieldCheckIcon, ShareIcon, PrinterIcon, ArrowDownTrayIcon, CheckCircleIcon, XCircleIcon, EnvelopeIcon, ChatBubbleLeftRightIcon, ClipboardIcon } from '@heroicons/react/24/outline';
 import { InvoiceService } from '../services/invoiceService';
+
+interface NotificationState {
+  message: string;
+  type: 'success' | 'info' | 'error';
+}
 
 const ViewInvoice: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -14,12 +19,69 @@ const ViewInvoice: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
   const [isSendingEmail, setIsSendingEmail] = useState(false);
-  const [notification, setNotification] = useState<{message: string, type: 'success' | 'info' | 'error'} | null>(null);
+  const [notification, setNotification] = useState<NotificationState | null>(null);
+  
+  // Post-Generation Share Modal State
+  const [showShareModal, setShowShareModal] = useState(false);
 
   // Helper to show notifications
   const showNotification = (msg: string, type: 'success' | 'info' | 'error' = 'info') => {
     setNotification({ message: msg, type });
     setTimeout(() => setNotification(null), 5000);
+  };
+
+  const handleCopyLink = () => {
+      const url = window.location.href;
+      
+      const fallbackCopy = () => {
+          try {
+              const textArea = document.createElement("textarea");
+              textArea.value = url;
+              textArea.style.position = "fixed";
+              textArea.style.left = "-9999px";
+              document.body.appendChild(textArea);
+              textArea.focus();
+              textArea.select();
+              const successful = document.execCommand('copy');
+              document.body.removeChild(textArea);
+              if (successful) {
+                  showNotification("Link copied to clipboard", 'success');
+              } else {
+                  window.prompt("Copy this link:", url);
+              }
+          } catch (e) {
+              window.prompt("Copy this link:", url);
+          }
+      };
+
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(url).then(() => {
+              showNotification("Link copied to clipboard", 'success');
+          }).catch(() => {
+              fallbackCopy();
+          });
+      } else {
+          fallbackCopy();
+      }
+  };
+
+  const handleWhatsAppShare = () => {
+    if (!invoice || !invoice.buyerPhone) {
+        showNotification("Client phone number missing.", "error");
+        return;
+    }
+
+    // Clean phone number
+    let phone = invoice.buyerPhone.replace(/[^0-9]/g, '');
+    if (phone.length === 10) {
+        phone = '91' + phone;
+    }
+
+    const url = window.location.href;
+    const typeLabel = invoice.type === 'QUOTATION' ? 'Quotation' : 'Invoice';
+    const text = `Hello ${invoice.buyerName},%0A%0AHere is your ${typeLabel} *${invoice.invoiceNumber}* from ${invoice.businessName}.%0A%0AYou can view and pay it here:%0A${url}%0A%0AThank you!`;
+
+    window.open(`https://wa.me/${phone}?text=${text}`, '_blank');
   };
 
   // Reusable PDF E-mailing Function
@@ -48,10 +110,17 @@ const ViewInvoice: React.FC = () => {
     try {
         const pdfBase64 = await (window as any).html2pdf().from(element).set(opt).outputPdf('datauristring');
         await InvoiceService.sendPdfByEmail(currentInvoice, pdfBase64);
+        
+        // If this was triggered by Creation or Payment, show the Share Modal instead of just a toast
+        setShowShareModal(true);
+        // We still show a small success toast in background
         showNotification("Email sent successfully!", 'success');
+
     } catch (error: any) {
         console.error("Email Error:", error);
         showNotification("Failed to send email.", 'error');
+        // Still show share modal so they can WhatsApp even if Email failed
+        setShowShareModal(true);
     } finally {
         setIsSendingEmail(false);
     }
@@ -88,7 +157,7 @@ const ViewInvoice: React.FC = () => {
         if (data && mounted && location.state?.autoSendEmail) {
             // Clear state so it doesn't fire on refresh
             window.history.replaceState({}, document.title);
-            generateAndSendPDF(data, location.state.emailType || 'CREATED');
+            setTimeout(() => generateAndSendPDF(data, location.state.emailType || 'CREATED'), 500);
         }
     };
 
@@ -294,13 +363,62 @@ const ViewInvoice: React.FC = () => {
       
       {/* Toast Notification */}
       {notification && (
-        <div className={`fixed top-6 left-1/2 -translate-x-1/2 z-[999] px-6 py-4 rounded-xl shadow-2xl flex items-center gap-3 animate-bounce-in ${
+        <div className={`fixed top-6 left-1/2 -translate-x-1/2 z-[999] px-6 py-4 rounded-xl shadow-2xl flex flex-col md:flex-row items-center gap-4 animate-bounce-in ${
           notification.type === 'success' ? 'bg-green-600 text-white' : 
           notification.type === 'error' ? 'bg-red-600 text-white' : 'bg-gray-800 text-white'
         }`}>
-           {notification.type === 'success' && <CheckCircleIcon className="w-6 h-6"/>}
-           {notification.type === 'error' && <XCircleIcon className="w-6 h-6"/>}
-           <span className="font-medium">{notification.message}</span>
+           <div className="flex items-center gap-3">
+             {notification.type === 'success' && <CheckCircleIcon className="w-6 h-6"/>}
+             {notification.type === 'error' && <XCircleIcon className="w-6 h-6"/>}
+             <span className="font-medium">{notification.message}</span>
+           </div>
+           
+           <button onClick={() => setNotification(null)} className="ml-2 opacity-60 hover:opacity-100">
+             <XCircleIcon className="w-5 h-5" />
+           </button>
+        </div>
+      )}
+
+      {/* SHARE MODAL */}
+      {showShareModal && (
+        <div className="fixed inset-0 z-[2000] flex items-center justify-center p-4">
+           <div className="absolute inset-0 bg-gray-900/60 backdrop-blur-sm" onClick={() => setShowShareModal(false)}></div>
+           <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden animate-fade-in-up">
+              <div className="p-6 text-center">
+                 <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <CheckCircleIcon className="w-10 h-10 text-green-600" />
+                 </div>
+                 <h3 className="text-xl font-bold text-gray-900 mb-2">
+                    {invoice.type === 'QUOTATION' ? 'Quotation Sent!' : 'Invoice Sent!'}
+                 </h3>
+                 <p className="text-sm text-gray-600 mb-6">
+                    A PDF copy has been emailed to <strong>{invoice.buyerEmail}</strong>.
+                 </p>
+                 
+                 <div className="space-y-3">
+                    <button 
+                        onClick={handleWhatsAppShare}
+                        className="w-full py-3 bg-[#25D366] hover:bg-[#20bd5a] text-white font-bold rounded-xl flex items-center justify-center gap-2 shadow-lg shadow-green-200 transition-colors"
+                    >
+                        <ChatBubbleLeftRightIcon className="w-6 h-6" />
+                        Share on WhatsApp
+                    </button>
+                    
+                    <button 
+                        onClick={handleCopyLink}
+                        className="w-full py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold rounded-xl flex items-center justify-center gap-2 transition-colors"
+                    >
+                        <ClipboardIcon className="w-5 h-5" />
+                        Copy Link
+                    </button>
+                 </div>
+              </div>
+              <div className="bg-gray-50 px-6 py-3 border-t border-gray-100 flex justify-center">
+                 <button onClick={() => setShowShareModal(false)} className="text-sm text-gray-500 hover:text-gray-700">
+                    Close
+                 </button>
+              </div>
+           </div>
         </div>
       )}
 
@@ -322,8 +440,9 @@ const ViewInvoice: React.FC = () => {
              PayLink
           </div>
           <div className="flex gap-2 items-center">
-             {/* MANUAL BUTTON REMOVED per requirements */}
              
+             {/* WhatsApp Button removed as per request */}
+
              <button 
               onClick={handleDownloadPdf} 
               disabled={isDownloading}
@@ -339,7 +458,7 @@ const ViewInvoice: React.FC = () => {
             <button onClick={() => window.print()} className="p-2 text-gray-600 hover:bg-gray-100 rounded-full hidden md:block" title="Print">
                <PrinterIcon className="w-6 h-6" />
             </button>
-            <button onClick={() => navigator.clipboard.writeText(window.location.href)} className="p-2 text-gray-600 hover:bg-gray-100 rounded-full" title="Copy Link">
+            <button onClick={handleCopyLink} className="p-2 text-gray-600 hover:bg-gray-100 rounded-full" title="Copy Link">
                <ShareIcon className="w-6 h-6" />
             </button>
           </div>

@@ -1,6 +1,9 @@
 import { InvoiceData, PaymentStatus, PaymentGateway } from '../types';
 
-const API_BASE = 'http://localhost:3000/api';
+// Use relative path to allow Vite proxy to handle the request destination.
+// This fixes "Failed to fetch" when accessing via network IP (e.g. mobile testing) 
+// or when CORS preflight fails on localhost mismatch.
+const API_BASE = '/api'; 
 const LOCAL_STORAGE_KEY = 'paylink_invoices';
 
 // --- LocalStorage Fallback Implementation ---
