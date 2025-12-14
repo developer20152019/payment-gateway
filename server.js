@@ -10,7 +10,11 @@
  */
 
 // Load environment variables from .env file
-require('dotenv').config();
+try {
+    require('dotenv').config();
+} catch (e) {
+    console.warn("\x1b[33m%s\x1b[0m", "⚠️  'dotenv' module not found. Environment variables must be set manually.");
+}
 
 // --- DEPENDENCY CHECK ---
 let express, cors, sql, bodyParser, qs, Razorpay, crypto, nodemailer, GoogleGenAI;
@@ -50,6 +54,8 @@ try {
     if (e.code === 'MODULE_NOT_FOUND') {
         console.error('\n\x1b[31m%s\x1b[0m', '======================================================');
         console.error('\x1b[31m%s\x1b[0m', ' [ERROR] Missing Backend Dependencies');
+        console.error('\x1b[33m%s\x1b[0m', ' Please run: npm install');
+        console.error('\x1b[31m%s\x1b[0m', '======================================================');
         process.exit(1);
     } else {
         throw e;
