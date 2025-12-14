@@ -3,13 +3,13 @@
  * 
  * Features:
  * 1. Secure SQL Server Persistence (CRUD for Invoices & Products)
- * 2. CCAvenue Payment Integration
+ * 2. CCAvenue Payment Integration (AES-128-CBC)
  * 3. Razorpay Payment Integration
  * 4. Email Notifications (Nodemailer)
  */
 
 // --- DEPENDENCY CHECK ---
-let express, cors, sql, bodyParser, qs, ccav, Razorpay, crypto, nodemailer;
+let express, cors, sql, bodyParser, qs, Razorpay, crypto, nodemailer;
 try {
     express = require('express');
     cors = require('cors');
@@ -30,16 +30,6 @@ try {
         console.warn("\x1b[33m%s\x1b[0m", "⚠️  'nodemailer' not found. Email features will simulate logging only.");
     }
 
-    try {
-        ccav = require('./NodeJS_Integration_Kit/AES-128/customData/ccavutil.js');
-    } catch (kitError) {
-        // Fallback for demo purposes if kit isn't present
-        ccav = {
-            encrypt: () => 'mock_encrypted_string',
-            decrypt: () => 'order_status=Success&order_id=123'
-        };
-    }
-
 } catch (e) {
     if (e.code === 'MODULE_NOT_FOUND') {
         console.error('\n\x1b[31m%s\x1b[0m', '======================================================');
@@ -57,33 +47,79 @@ app.use(cors());
 app.use(bodyParser.json({ limit: '10mb' }));
 app.use(bodyParser.urlencoded({ extended: true }));
 
-// ... [CONFIGURATION SECTIONS] ...
+// --- SECURITY CONFIGURATION ---
+// STRICT: Do not fallback to hardcoded secrets in production code.
 const ccavenueConfig = {
-    workingKey: process.env.WORKING_KEY || '6021B65F58276621F3C2ADC921A7AD65', 
-    merchantId: process.env.MERCHANT_ID || '4411688',
-    accessCode: process.env.ACCESS_CODE || 'AVGY85MK93BL01YGLB',
+    workingKey: process.env.CCAV_WORKING_KEY || '', 
+    merchantId: process.env.CCAV_MERCHANT_ID || '',
+    accessCode: process.env.CCAV_ACCESS_CODE || '',
 };
 
 const razorpayConfig = {
-    key_id: process.env.RAZORPAY_KEY_ID || 'rzp_test_YourKeyID',
-    key_secret: process.env.RAZORPAY_KEY_SECRET || 'YourKeySecret'
+    key_id: process.env.RAZORPAY_KEY_ID || '',
+    key_secret: process.env.RAZORPAY_KEY_SECRET || ''
 };
 
+// Check for missing keys on startup
+if (!ccavenueConfig.workingKey && !razorpayConfig.key_id) {
+    console.warn("\x1b[33m%s\x1b[0m", "⚠️  Payment Gateway Keys missing in process.env. Payments will fail or run in simulation mode.");
+}
+
 // --- EMAIL CONFIGURATION ---
-// In a real app, use environment variables.
 const emailTransporter = nodemailer ? nodemailer.createTransport({
-    host: "smtp.ethereal.email", // Replace with real SMTP (Gmail/SendGrid/AWS)
+    host: process.env.SMTP_HOST || "smtp.ethereal.email", 
     port: 587,
     secure: false, 
     auth: {
-        user: 'ethereal_user', 
-        pass: 'ethereal_pass'
+        user: process.env.SMTP_USER || 'ethereal_user', 
+        pass: process.env.SMTP_PASS || 'ethereal_pass'
     }
 }) : null;
 
-// ... [PAYMENT ENDPOINTS REMAIN UNCHANGED] ...
+// --- CCAVENUE CRYPTO UTILS (AES-128-CBC) ---
+// Re-implemented here to avoid dependency on 'NodeJS_Integration_Kit' folder
+const ccav = {
+    encrypt: function (plainText, workingKey) {
+        try {
+            const m = crypto.createHash('md5');
+            m.update(workingKey);
+            const key = m.digest(); 
+            const iv = Buffer.from('\x00\x01\x02\x03\x04\x05\x06\x07\x08\x09\x0a\x0b\x0c\x0d\x0e\x0f', 'binary');	
+            const cipher = crypto.createCipheriv('aes-128-cbc', key, iv);
+            let encoded = cipher.update(plainText,'utf8','hex');
+            encoded += cipher.final('hex');
+            return encoded;
+        } catch (e) {
+            console.error("Encryption Error:", e.message);
+            return null;
+        }
+    },
+    decrypt: function (encText, workingKey) {
+        try {
+            const m = crypto.createHash('md5');
+            m.update(workingKey);
+            const key = m.digest();
+            const iv = Buffer.from('\x00\x01\x02\x03\x04\x05\x06\x07\x08\x09\x0a\x0b\x0c\x0d\x0e\x0f', 'binary');	
+            const decipher = crypto.createDecipheriv('aes-128-cbc', key, iv);
+            let decoded = decipher.update(encText,'hex','utf8');
+            decoded += decipher.final('utf8');
+            return decoded;
+        } catch (e) {
+            console.error("Decryption Error:", e.message);
+            return null;
+        }
+    }
+};
+
+// ... [PAYMENT ENDPOINTS] ...
 app.post('/api/payment/initiate', (req, res) => {
     const { order_id, amount, currency, billing_name, billing_address, email, billing_tel } = req.body;
+    
+    // Check if configuration exists
+    if (!ccavenueConfig.workingKey || !ccavenueConfig.merchantId) {
+        return res.status(500).send("Server Error: CCAvenue credentials not configured.");
+    }
+
     const params = {
         merchant_id: ccavenueConfig.merchantId,
         order_id: order_id,
@@ -97,8 +133,12 @@ app.post('/api/payment/initiate', (req, res) => {
         billing_email: email,
         billing_tel: billing_tel,
     };
+    
     const bodyData = qs.stringify(params);
     const encRequest = ccav.encrypt(bodyData, ccavenueConfig.workingKey);
+    
+    if (!encRequest) return res.status(500).send("Encryption failed");
+
     const formBody = `<html><head><title>Redirecting...</title><script>window.onload=function(){document.forms['redirect'].submit();};</script></head><body><form id="nonseamless" method="post" name="redirect" action="https://test.ccavenue.com/transaction/transaction.do?command=initiateTransaction"><input type="hidden" id="encRequest" name="encRequest" value="${encRequest}"><input type="hidden" name="access_code" id="access_code" value="${ccavenueConfig.accessCode}"></form></body></html>`;
     res.setHeader('Content-Type', 'text/html');
     res.send(formBody);
@@ -106,14 +146,55 @@ app.post('/api/payment/initiate', (req, res) => {
 
 app.post('/api/payment/callback', async (req, res) => {
     const encResp = req.body.encResp;
-    // ... (Mock implementation for brevity in this specific update)
-    const orderId = "inv_123"; // Extracted from resp
+    if (!encResp) return res.status(400).send("No response data");
+
+    const decodedStr = ccav.decrypt(encResp, ccavenueConfig.workingKey);
+    if (!decodedStr) return res.status(500).send("Decryption failed");
+
+    const data = qs.parse(decodedStr);
+    const orderId = data.order_id;
+    const orderStatus = data.order_status;
+
+    console.log(`CCAvenue Callback: Order ${orderId} is ${orderStatus}`);
+
+    // Update DB if successful
+    if (sql.connected && orderStatus === 'Success') {
+        try { 
+            await sql.query`UPDATE Invoices SET Status = 'PAID', PaymentGateway = 'CCAvenue' WHERE ID = ${orderId}`; 
+        } catch (dbErr) {
+            console.error("DB Update Failed:", dbErr);
+        }
+    }
+
     const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
-    res.send(`<html><body><script>window.location.href = '${frontendUrl}/#/view/${orderId}';</script></body></html>`);
+    
+    // Communicate with Parent Window (if iframe/popup)
+    res.send(`
+        <html>
+        <body>
+            <p>Payment processed. Redirecting...</p>
+            <script>
+                // Notify parent window if exists
+                if (window.opener) {
+                    window.opener.postMessage('${orderStatus === 'Success' ? 'PAYMENT_SUCCESS' : 'PAYMENT_CANCEL'}', '*');
+                    window.close();
+                } else {
+                    window.location.href = '${frontendUrl}/#/view/${orderId}';
+                }
+            </script>
+        </body>
+        </html>
+    `);
 });
 
 app.post('/api/payment/razorpay/create-order', async (req, res) => {
-    if (!razorpayInstance) return res.status(500).json({ error: "Razorpay not configured" });
+    if (!razorpayConfig.key_id) return res.status(500).json({ error: "Razorpay keys missing" });
+    
+    const razorpayInstance = new Razorpay({
+        key_id: razorpayConfig.key_id,
+        key_secret: razorpayConfig.key_secret
+    });
+
     const { amount, currency, receipt } = req.body;
     try {
         const order = await razorpayInstance.orders.create({
@@ -124,17 +205,30 @@ app.post('/api/payment/razorpay/create-order', async (req, res) => {
         });
         res.json({ id: order.id, currency: order.currency, amount: order.amount, key_id: razorpayConfig.key_id });
     } catch (error) {
+        console.error("Razorpay Error:", error);
         res.status(500).json({ error: "Failed to create order" });
     }
 });
 
 app.post('/api/payment/razorpay/verify', async (req, res) => {
     const { razorpay_order_id, razorpay_payment_id, razorpay_signature, invoice_id } = req.body;
-    // ... verification logic ...
-    if (sql.connected && invoice_id) {
-        try { await sql.query`UPDATE Invoices SET Status = 'PAID' WHERE ID = ${invoice_id}`; } catch (dbErr) {}
+    
+    const body = razorpay_order_id + "|" + razorpay_payment_id;
+    const expectedSignature = crypto
+        .createHmac("sha256", razorpayConfig.key_secret)
+        .update(body.toString())
+        .digest("hex");
+
+    if (expectedSignature === razorpay_signature) {
+        if (sql.connected && invoice_id) {
+            try { 
+                await sql.query`UPDATE Invoices SET Status = 'PAID', PaymentGateway = 'Razorpay' WHERE ID = ${invoice_id}`; 
+            } catch (dbErr) {}
+        }
+        res.json({ status: "success" });
+    } else {
+        res.status(400).json({ status: "failure" });
     }
-    res.json({ status: "success" });
 });
 
 // ==========================================
@@ -143,20 +237,27 @@ app.post('/api/payment/razorpay/verify', async (req, res) => {
 app.post('/api/notify', async (req, res) => {
     const { to, subject, body, link, type } = req.body;
     
-    console.log(`\n📨 [EMAIL SIMULATION] -------------------------`);
-    console.log(`To: ${to}`);
-    console.log(`Subject: ${subject}`);
-    console.log(`Type: ${type}`);
-    console.log(`Link: ${link}`);
-    console.log(`-------------------------------------------------\n`);
+    console.log(`\n📨 [EMAIL] To: ${to} | Subject: ${subject}`);
 
     if (emailTransporter) {
-        // In a real scenario, we would send the mail here
-        // await emailTransporter.sendMail(...)
+        try {
+            await emailTransporter.sendMail({
+                from: '"PayLink System" <no-reply@paylink.com>',
+                to,
+                subject,
+                text: `${body}\n\nLink: ${link}`,
+                html: `<div style="font-family: sans-serif; padding: 20px;">
+                        <h2>${subject}</h2>
+                        <p>${body}</p>
+                        <a href="${link}" style="display: inline-block; background: #4f46e5; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">View Document</a>
+                       </div>`
+            });
+        } catch(e) {
+            console.error("Email send failed:", e.message);
+        }
     }
 
-    // Always return success for the UI
-    res.json({ message: "Notification queued" });
+    res.json({ message: "Notification processed" });
 });
 
 // ==========================================
@@ -180,7 +281,7 @@ sql.connect(sqlConfig).then(() => {
 const mapToInvoice = (record, items = []) => ({
     id: record.ID,
     invoiceNumber: record.InvoiceNumber,
-    type: record.Type || 'INVOICE', // Handle legacy data
+    type: record.Type || 'INVOICE',
     date: record.Date ? record.Date.toISOString().split('T')[0] : '',
     dueDate: record.DueDate ? record.DueDate.toISOString().split('T')[0] : '',
     template: record.Template,
@@ -230,7 +331,7 @@ app.get('/api/invoices/:id', async (req, res) => {
         const itemsResult = await sql.query`SELECT * FROM LineItems WHERE InvoiceID = ${req.params.id}`;
         const items = itemsResult.recordset.map(i => ({ 
             id: i.ID, 
-            name: i.ItemName || '', // Handle new column
+            name: i.ItemName || '',
             description: i.Description, 
             quantity: i.Quantity, 
             rate: i.Rate, 
@@ -331,7 +432,6 @@ app.post('/api/invoices', async (req, res) => {
 });
 
 app.delete('/api/invoices/:id', async (req, res) => {
-    // ... (Existing delete logic)
     if (!sql.connected) return res.status(503).json({ error: "Database unavailable" });
     const transaction = new sql.Transaction();
     try {
@@ -348,7 +448,7 @@ app.delete('/api/invoices/:id', async (req, res) => {
     }
 });
 
-// ... [PRODUCT ENDPOINTS REMAIN UNCHANGED] ...
+// ... [PRODUCT ENDPOINTS] ...
 app.get('/api/products', async (req, res) => {
     if (!sql.connected) return res.status(503).json({ error: "Database unavailable" });
     try {
@@ -395,4 +495,5 @@ app.delete('/api/products/:id', async (req, res) => {
 
 app.listen(PORT, () => {
     console.log(`Unified Server running at http://localhost:${PORT}`);
+    console.log("Environment: " + (process.env.NODE_ENV || 'development'));
 });
