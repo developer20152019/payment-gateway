@@ -403,7 +403,7 @@ const CreateInvoice: React.FC = () => {
 
   // Filter customers for autocomplete
   const filteredCustomers = customers.filter(c => 
-    c.name.toLowerCase().includes((invoice.buyerName || '').toLowerCase())
+    (c.name || '').toLowerCase().includes((invoice.buyerName || '').toLowerCase())
   );
 
   if (isLoading) {
