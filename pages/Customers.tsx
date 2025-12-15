@@ -148,39 +148,41 @@ const Customers: React.FC = () => {
             ) : customers.length === 0 ? (
                 <div className="p-8 text-center text-gray-500">No customers saved yet.</div>
             ) : (
-                <table className="w-full text-left text-sm text-gray-600">
-                    <thead className="bg-gray-50 text-xs uppercase font-medium text-gray-500 border-b border-gray-100">
-                        <tr>
-                            <th className="px-6 py-3">Name</th>
-                            <th className="px-6 py-3">Contact</th>
-                            <th className="px-6 py-3 text-right">Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-100">
-                        {customers.map((c) => (
-                            <tr key={c.id} className={`hover:bg-gray-50 ${editingId === c.id ? 'bg-indigo-50' : ''}`}>
-                                <td className="px-6 py-3 font-medium text-gray-900">
-                                    {c.name}
-                                    <div className="text-xs text-gray-400 font-normal">{c.address}</div>
-                                </td>
-                                <td className="px-6 py-3">
-                                    <div className="text-gray-900">{c.email}</div>
-                                    <div className="text-xs text-gray-500">{c.phone}</div>
-                                </td>
-                                <td className="px-6 py-3 text-right">
-                                    <div className="flex justify-end gap-2">
-                                        <button onClick={() => handleEdit(c)} className="text-blue-500 hover:text-blue-700 p-1 hover:bg-blue-50 rounded">
-                                            <PencilIcon className="w-4 h-4" />
-                                        </button>
-                                        <button onClick={() => handleDelete(c.id)} className="text-red-500 hover:text-red-700 p-1 hover:bg-red-50 rounded">
-                                            <TrashIcon className="w-4 h-4" />
-                                        </button>
-                                    </div>
-                                </td>
+                <div className="overflow-x-auto overflow-y-auto max-h-[400px]">
+                    <table className="w-full text-left text-sm text-gray-600">
+                        <thead className="bg-gray-50 text-xs uppercase font-medium text-gray-500 border-b border-gray-100 sticky top-0 z-10 shadow-sm">
+                            <tr>
+                                <th className="px-6 py-3 bg-gray-50">Name</th>
+                                <th className="px-6 py-3 bg-gray-50">Contact</th>
+                                <th className="px-6 py-3 text-right bg-gray-50">Actions</th>
                             </tr>
-                        ))}
-                    </tbody>
-                </table>
+                        </thead>
+                        <tbody className="divide-y divide-gray-100">
+                            {customers.map((c) => (
+                                <tr key={c.id} className={`hover:bg-gray-50 ${editingId === c.id ? 'bg-indigo-50' : ''}`}>
+                                    <td className="px-6 py-3 font-medium text-gray-900">
+                                        {c.name}
+                                        <div className="text-xs text-gray-400 font-normal">{c.address}</div>
+                                    </td>
+                                    <td className="px-6 py-3">
+                                        <div className="text-gray-900">{c.email}</div>
+                                        <div className="text-xs text-gray-500">{c.phone}</div>
+                                    </td>
+                                    <td className="px-6 py-3 text-right">
+                                        <div className="flex justify-end gap-2">
+                                            <button onClick={() => handleEdit(c)} className="text-blue-500 hover:text-blue-700 p-1 hover:bg-blue-50 rounded">
+                                                <PencilIcon className="w-4 h-4" />
+                                            </button>
+                                            <button onClick={() => handleDelete(c.id)} className="text-red-500 hover:text-red-700 p-1 hover:bg-red-50 rounded">
+                                                <TrashIcon className="w-4 h-4" />
+                                            </button>
+                                        </div>
+                                    </td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
             )}
         </div>
       </div>

@@ -351,24 +351,71 @@ const Dashboard: React.FC = () => {
                             <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path></svg>
                         </div>
                     </div>
+
+                    {/* 4. Date Range */}
+                    <div className="md:col-span-4 flex gap-2 items-center">
+                        <input
+                            type="date"
+                            className="block w-full border border-gray-300 rounded-lg text-sm p-2 text-gray-600 focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 transition-all"
+                            value={dateRange.start}
+                            onChange={(e) => setDateRange({ ...dateRange, start: e.target.value })}
+                            title="Start Date"
+                        />
+                        <span className="text-gray-400 text-sm">to</span>
+                        <input
+                            type="date"
+                            className="block w-full border border-gray-300 rounded-lg text-sm p-2 text-gray-600 focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 transition-all"
+                            value={dateRange.end}
+                            onChange={(e) => setDateRange({ ...dateRange, end: e.target.value })}
+                            title="End Date"
+                        />
+                    </div>
+                 </div>
+
+                 {/* Resource Filters Row */}
+                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-2 border-t border-gray-200 border-dashed">
+                    <div className="relative">
+                        <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                            <ClipboardDocumentListIcon className="h-4 w-4 text-gray-400" />
+                        </div>
+                        <input
+                            type="text"
+                            placeholder="Filter by Resource Section"
+                            className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg text-sm bg-white placeholder-gray-400 focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 transition-all"
+                            value={resourceSectionFilter}
+                            onChange={(e) => setResourceSectionFilter(e.target.value)}
+                        />
+                    </div>
+                    <div className="relative">
+                        <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                            <TagIcon className="h-4 w-4 text-gray-400" />
+                        </div>
+                        <input
+                            type="text"
+                            placeholder="Filter by Resource Name"
+                            className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg text-sm bg-white placeholder-gray-400 focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 transition-all"
+                            value={resourceNameFilter}
+                            onChange={(e) => setResourceNameFilter(e.target.value)}
+                        />
+                    </div>
                  </div>
              </div>
           </div>
 
-          <div className="overflow-x-auto">
+          <div className="overflow-x-auto overflow-y-auto max-h-[400px]">
                 <table className="w-full text-left border-collapse">
-                   <thead className="bg-gray-50 text-xs uppercase font-medium text-gray-500 border-b border-gray-100">
+                   <thead className="bg-gray-50 text-xs uppercase font-medium text-gray-500 border-b border-gray-100 sticky top-0 z-10 shadow-sm">
                       <tr>
-                         <th className="px-6 py-4">Document</th>
-                         <th className="px-6 py-4">Client</th>
-                         <th className="px-6 py-4 cursor-pointer hover:text-gray-700" onClick={() => handleSort('date')}>
+                         <th className="px-6 py-4 bg-gray-50">Document</th>
+                         <th className="px-6 py-4 bg-gray-50">Client</th>
+                         <th className="px-6 py-4 cursor-pointer hover:text-gray-700 bg-gray-50" onClick={() => handleSort('date')}>
                             <div className="flex items-center gap-1">Date {sortConfig.key === 'date' && (sortConfig.direction === 'asc' ? <ArrowUpIcon className="w-3 h-3"/> : <ArrowDownIcon className="w-3 h-3"/>)}</div>
                          </th>
-                         <th className="px-6 py-4 cursor-pointer hover:text-gray-700 text-right" onClick={() => handleSort('amount')}>
+                         <th className="px-6 py-4 cursor-pointer hover:text-gray-700 text-right bg-gray-50" onClick={() => handleSort('amount')}>
                             <div className="flex items-center justify-end gap-1">Amount {sortConfig.key === 'amount' && (sortConfig.direction === 'asc' ? <ArrowUpIcon className="w-3 h-3"/> : <ArrowDownIcon className="w-3 h-3"/>)}</div>
                          </th>
-                         <th className="px-6 py-4 text-center">Status</th>
-                         <th className="px-6 py-4 text-right">Actions</th>
+                         <th className="px-6 py-4 text-center bg-gray-50">Status</th>
+                         <th className="px-6 py-4 text-right bg-gray-50">Actions</th>
                       </tr>
                    </thead>
                    <tbody className="divide-y divide-gray-100 text-sm">

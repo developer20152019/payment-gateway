@@ -170,43 +170,45 @@ const Products: React.FC = () => {
             ) : products.length === 0 ? (
                 <div className="p-8 text-center text-gray-500">No products saved yet.</div>
             ) : (
-                <table className="w-full text-left text-sm text-gray-600">
-                    <thead className="bg-gray-50 text-xs uppercase font-medium text-gray-500 border-b border-gray-100">
-                        <tr>
-                            <th className="px-6 py-3 w-1/4">Name</th>
-                            <th className="px-6 py-3 w-2/4">Description</th>
-                            <th className="px-6 py-3 text-right w-1/4">Rate</th>
-                            <th className="px-6 py-3 text-right w-[100px]">Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-100">
-                        {products.map((p) => (
-                            <tr key={p.id} className={`hover:bg-gray-50 ${editingId === p.id ? 'bg-indigo-50' : ''}`}>
-                                <td className="px-6 py-3 font-medium text-gray-900">{p.name}</td>
-                                <td className="px-6 py-3 text-gray-500 break-words max-w-sm" title={p.description}>{p.description}</td>
-                                <td className="px-6 py-3 text-right font-medium">{p.rate.toFixed(2)}</td>
-                                <td className="px-6 py-3 text-right">
-                                    <div className="flex justify-end gap-2">
-                                        <button 
-                                            onClick={() => handleEdit(p)}
-                                            className="text-blue-500 hover:text-blue-700 p-1 hover:bg-blue-50 rounded"
-                                            title="Edit"
-                                        >
-                                            <PencilIcon className="w-4 h-4" />
-                                        </button>
-                                        <button 
-                                            onClick={() => handleDelete(p.id)}
-                                            className="text-red-500 hover:text-red-700 p-1 hover:bg-red-50 rounded"
-                                            title="Delete"
-                                        >
-                                            <TrashIcon className="w-4 h-4" />
-                                        </button>
-                                    </div>
-                                </td>
+                <div className="overflow-x-auto overflow-y-auto max-h-[400px]">
+                    <table className="w-full text-left text-sm text-gray-600">
+                        <thead className="bg-gray-50 text-xs uppercase font-medium text-gray-500 border-b border-gray-100 sticky top-0 z-10 shadow-sm">
+                            <tr>
+                                <th className="px-6 py-3 w-1/4 bg-gray-50">Name</th>
+                                <th className="px-6 py-3 w-2/4 bg-gray-50">Description</th>
+                                <th className="px-6 py-3 text-right w-1/4 bg-gray-50">Rate</th>
+                                <th className="px-6 py-3 text-right w-[100px] bg-gray-50">Actions</th>
                             </tr>
-                        ))}
-                    </tbody>
-                </table>
+                        </thead>
+                        <tbody className="divide-y divide-gray-100">
+                            {products.map((p) => (
+                                <tr key={p.id} className={`hover:bg-gray-50 ${editingId === p.id ? 'bg-indigo-50' : ''}`}>
+                                    <td className="px-6 py-3 font-medium text-gray-900">{p.name}</td>
+                                    <td className="px-6 py-3 text-gray-500 break-words max-w-sm" title={p.description}>{p.description}</td>
+                                    <td className="px-6 py-3 text-right font-medium">{p.rate.toFixed(2)}</td>
+                                    <td className="px-6 py-3 text-right">
+                                        <div className="flex justify-end gap-2">
+                                            <button 
+                                                onClick={() => handleEdit(p)}
+                                                className="text-blue-500 hover:text-blue-700 p-1 hover:bg-blue-50 rounded"
+                                                title="Edit"
+                                            >
+                                                <PencilIcon className="w-4 h-4" />
+                                            </button>
+                                            <button 
+                                                onClick={() => handleDelete(p.id)}
+                                                className="text-red-500 hover:text-red-700 p-1 hover:bg-red-50 rounded"
+                                                title="Delete"
+                                            >
+                                                <TrashIcon className="w-4 h-4" />
+                                            </button>
+                                        </div>
+                                    </td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
             )}
         </div>
       </div>
