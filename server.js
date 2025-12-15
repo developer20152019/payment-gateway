@@ -11,7 +11,7 @@ const PORT = process.env.PORT || 3000;
 
 // --- Middleware ---
 app.use(cors());
-app.use(express.json({ limit: '50mb' })); // Increased limit for Base64 PDFs/Images
+app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
 // --- Database Connection ---
@@ -28,7 +28,7 @@ const dbConfig = {
 
 const pool = mysql.createPool(dbConfig);
 
-// Test DB Connection on Start
+// Test DB Connection
 (async () => {
     try {
         const connection = await pool.getConnection();
@@ -48,12 +48,11 @@ const razorpay = new Razorpay({
 });
 
 // CCAvenue Crypto Utils (AES-128-CBC)
-// Matches the standard Node.js Integration Kit logic
 const ccav = {
     encrypt: function (plainText, workingKey) {
         const m = crypto.createHash('md5');
         m.update(workingKey);
-        const key = m.digest();
+        const key = m.digest(); // Buffer (16 bytes)
         const iv = Buffer.from('\x00\x01\x02\x03\x04\x05\x06\x07\x08\x09\x0a\x0b\x0c\x0d\x0e\x0f', 'binary');
         const cipher = crypto.createCipheriv('aes-128-cbc', key, iv);
         let encoded = cipher.update(plainText, 'utf8', 'hex');
@@ -63,7 +62,7 @@ const ccav = {
     decrypt: function (encText, workingKey) {
         const m = crypto.createHash('md5');
         m.update(workingKey);
-        const key = m.digest();
+        const key = m.digest(); // Buffer (16 bytes)
         const iv = Buffer.from('\x00\x01\x02\x03\x04\x05\x06\x07\x08\x09\x0a\x0b\x0c\x0d\x0e\x0f', 'binary');
         const decipher = crypto.createDecipheriv('aes-128-cbc', key, iv);
         let decoded = decipher.update(encText, 'hex', 'utf8');
@@ -75,17 +74,9 @@ const ccav = {
 // --- API Routes ---
 
 // 1. PRODUCTS
-// We use aliases (AS) to ensure JSON returns camelCase keys matching the frontend interfaces
 app.get('/api/products', async (req, res) => {
     try {
-        const [rows] = await pool.query(`
-            SELECT 
-                ID as id, 
-                Name as name, 
-                Description as description, 
-                Rate as rate 
-            FROM Products
-        `);
+        const [rows] = await pool.query(`SELECT ID as id, Name as name, Description as description, Rate as rate FROM Products`);
         res.json(rows);
     } catch (err) {
         console.error(err);
@@ -97,8 +88,7 @@ app.post('/api/products', async (req, res) => {
     const { id, name, description, rate } = req.body;
     try {
         await pool.query(`
-            INSERT INTO Products (ID, Name, Description, Rate) 
-            VALUES (?, ?, ?, ?) 
+            INSERT INTO Products (ID, Name, Description, Rate) VALUES (?, ?, ?, ?) 
             ON DUPLICATE KEY UPDATE Name=?, Description=?, Rate=?
         `, [id, name, description, rate, name, description, rate]);
         res.json({ success: true });
@@ -120,18 +110,7 @@ app.delete('/api/products/:id', async (req, res) => {
 app.get('/api/customers', async (req, res) => {
     try {
         const [rows] = await pool.query(`
-            SELECT 
-                ID as id, 
-                Name as name, 
-                ContactPerson as contactPerson, 
-                Email as email, 
-                Phone as phone, 
-                Address as address, 
-                ShippingAddress as shippingAddress, 
-                Gstin as gstin, 
-                PlaceOfSupply as placeOfSupply, 
-                PinCode as pinCode 
-            FROM Customers
+            SELECT ID as id, Name as name, ContactPerson as contactPerson, Email as email, Phone as phone, Address as address, ShippingAddress as shippingAddress, Gstin as gstin, PlaceOfSupply as placeOfSupply, PinCode as pinCode FROM Customers
         `);
         res.json(rows);
     } catch (err) {
@@ -147,10 +126,7 @@ app.post('/api/customers', async (req, res) => {
             INSERT INTO Customers (ID, Name, ContactPerson, Email, Phone, Address, ShippingAddress, Gstin, PlaceOfSupply, PinCode) 
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?) 
             ON DUPLICATE KEY UPDATE Name=?, ContactPerson=?, Email=?, Phone=?, Address=?, ShippingAddress=?, Gstin=?, PlaceOfSupply=?, PinCode=?
-        `, [
-            id, name, contactPerson, email, phone, address, shippingAddress, gstin, placeOfSupply, pinCode,
-            name, contactPerson, email, phone, address, shippingAddress, gstin, placeOfSupply, pinCode
-        ]);
+        `, [id, name, contactPerson, email, phone, address, shippingAddress, gstin, placeOfSupply, pinCode, name, contactPerson, email, phone, address, shippingAddress, gstin, placeOfSupply, pinCode]);
         res.json({ success: true });
     } catch (err) {
         res.status(500).json({ error: err.message });
@@ -170,17 +146,7 @@ app.delete('/api/customers/:id', async (req, res) => {
 app.get('/api/settings/seller', async (req, res) => {
     try {
         const [rows] = await pool.query(`
-            SELECT 
-                ID as id,
-                SellerName as sellerName,
-                BusinessName as businessName,
-                SellerAddress as sellerAddress,
-                SellerGstin as sellerGstin,
-                SellerEmail as sellerEmail,
-                SellerPhone as sellerPhone,
-                LogoUrl as logoUrl,
-                BrandColor as brandColor
-            FROM SellerProfile LIMIT 1
+            SELECT ID as id, SellerName as sellerName, BusinessName as businessName, SellerAddress as sellerAddress, SellerGstin as sellerGstin, SellerEmail as sellerEmail, SellerPhone as sellerPhone, LogoUrl as logoUrl, BrandColor as brandColor FROM SellerProfile LIMIT 1
         `);
         res.json(rows.length > 0 ? rows[0] : {});
     } catch (err) {
@@ -197,10 +163,7 @@ app.post('/api/settings/seller', async (req, res) => {
             INSERT INTO SellerProfile (ID, SellerName, BusinessName, SellerAddress, SellerGstin, SellerEmail, SellerPhone, LogoUrl, BrandColor)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON DUPLICATE KEY UPDATE SellerName=?, BusinessName=?, SellerAddress=?, SellerGstin=?, SellerEmail=?, SellerPhone=?, LogoUrl=?, BrandColor=?
-        `, [
-            fixedId, sellerName, businessName, sellerAddress, sellerGstin, sellerEmail, sellerPhone, logoUrl, brandColor,
-            sellerName, businessName, sellerAddress, sellerGstin, sellerEmail, sellerPhone, logoUrl, brandColor
-        ]);
+        `, [fixedId, sellerName, businessName, sellerAddress, sellerGstin, sellerEmail, sellerPhone, logoUrl, brandColor, sellerName, businessName, sellerAddress, sellerGstin, sellerEmail, sellerPhone, logoUrl, brandColor]);
         res.json({ success: true });
     } catch (err) {
         res.status(500).json({ error: err.message });
@@ -210,8 +173,6 @@ app.post('/api/settings/seller', async (req, res) => {
 // 4. INVOICES
 app.get('/api/invoices', async (req, res) => {
     try {
-        // We select * here because Invoice data structure is large.
-        // The frontend service handles the mapping from TitleCase (DB) to camelCase (JS).
         const [rows] = await pool.query('SELECT * FROM Invoices ORDER BY Date DESC');
         res.json(rows);
     } catch (err) {
@@ -226,17 +187,7 @@ app.get('/api/invoices/:id', async (req, res) => {
         if (invoices.length === 0) return res.status(404).json({ error: 'Not found' });
 
         const invoice = invoices[0];
-        // Fetch Line Items
-        const [items] = await pool.query(`
-            SELECT 
-                ID as id,
-                ItemName as name,
-                Description as description,
-                Quantity as quantity,
-                Rate as rate,
-                Amount as amount
-            FROM LineItems WHERE InvoiceID = ?
-        `, [invoice.ID]);
+        const [items] = await pool.query(`SELECT ID as id, ItemName as name, Description as description, Quantity as quantity, Rate as rate, Amount as amount FROM LineItems WHERE InvoiceID = ?`, [invoice.ID]);
         
         invoice.items = items;
         res.json(invoice);
@@ -253,7 +204,6 @@ app.post('/api/invoices', async (req, res) => {
     try {
         await connection.beginTransaction();
 
-        // 1. Upsert Invoice
         await connection.query(`
             INSERT INTO Invoices 
             (ID, InvoiceNumber, Type, Date, DueDate, Template, BrandColor, LogoUrl, SellerName, BusinessName, SellerAddress, 
@@ -265,29 +215,18 @@ app.post('/api/invoices', async (req, res) => {
             SellerGstin=?, SellerEmail=?, SellerPhone=?, BuyerName=?, BuyerContactPerson=?, BuyerEmail=?, BuyerPhone=?, BuyerAddress=?, BuyerShippingAddress=?, PlaceOfSupply=?, BuyerPinCode=?,
             ResourceSection=?, ResourceName=?, Subtotal=?, TaxRate=?, TaxAmount=?, Total=?, Currency=?, Status=?, PaymentGateway=?, Notes=?
         `, [
-            // INSERT params
             inv.id, inv.invoiceNumber, inv.type, inv.date, inv.dueDate, inv.template, inv.brandColor, inv.logoUrl, inv.sellerName, inv.businessName, inv.sellerAddress,
             inv.sellerGstin, inv.sellerEmail, inv.sellerPhone, inv.buyerName, inv.buyerContactPerson, inv.buyerEmail, inv.buyerPhone, inv.buyerAddress, inv.buyerShippingAddress, inv.placeOfSupply, inv.buyerPinCode,
             inv.resourceSection, inv.resourceName, inv.subtotal, inv.taxRate, inv.taxAmount, inv.total, inv.currency, inv.status, inv.paymentGateway, inv.notes,
-            // UPDATE params
             inv.invoiceNumber, inv.type, inv.date, inv.dueDate, inv.template, inv.brandColor, inv.logoUrl, inv.sellerName, inv.businessName, inv.sellerAddress,
             inv.sellerGstin, inv.sellerEmail, inv.sellerPhone, inv.buyerName, inv.buyerContactPerson, inv.buyerEmail, inv.buyerPhone, inv.buyerAddress, inv.buyerShippingAddress, inv.placeOfSupply, inv.buyerPinCode,
             inv.resourceSection, inv.resourceName, inv.subtotal, inv.taxRate, inv.taxAmount, inv.total, inv.currency, inv.status, inv.paymentGateway, inv.notes
         ]);
 
-        // 2. Replace Line Items (Delete all and re-insert)
         await connection.query('DELETE FROM LineItems WHERE InvoiceID = ?', [inv.id]);
         
         if (inv.items && inv.items.length > 0) {
-            const itemValues = inv.items.map(item => [
-                item.id, 
-                inv.id, 
-                item.name, 
-                item.description, 
-                item.quantity, 
-                item.rate, 
-                item.amount
-            ]);
+            const itemValues = inv.items.map(item => [item.id, inv.id, item.name, item.description, item.quantity, item.rate, item.amount]);
             await connection.query('INSERT INTO LineItems (ID, InvoiceID, ItemName, Description, Quantity, Rate, Amount) VALUES ?', [itemValues]);
         }
 
@@ -313,18 +252,11 @@ app.delete('/api/invoices/:id', async (req, res) => {
     }
 });
 
-// 5. NOTIFICATION (Stub for now)
+// 5. NOTIFICATION
 app.post('/api/notify', async (req, res) => {
-    const { to, subject, body, attachments } = req.body;
-    console.log(`\n================ EMAIL SIMULATION ================`);
-    console.log(`To: ${to}`);
-    console.log(`Subject: ${subject}`);
-    if(attachments) console.log(`Attachment: ${attachments.length} file(s)`);
-    console.log(`==================================================\n`);
-    
-    // Integration point: Use nodemailer here to send real emails
-    
-    res.json({ success: true, message: "Email logged to console" });
+    const { to, subject } = req.body;
+    console.log(`\n📧 Email Stub: Sending to ${to}: ${subject}`);
+    res.json({ success: true });
 });
 
 // 6. PAYMENTS
@@ -334,7 +266,7 @@ app.post('/api/payment/razorpay/create-order', async (req, res) => {
     const { amount, currency, receipt } = req.body;
     try {
         const order = await razorpay.orders.create({
-            amount: Math.round(amount * 100), // convert to smallest currency unit (paise)
+            amount: Math.round(amount * 100),
             currency: currency || 'INR',
             receipt: receipt
         });
@@ -349,13 +281,9 @@ app.post('/api/payment/razorpay/verify', async (req, res) => {
     const { razorpay_order_id, razorpay_payment_id, razorpay_signature, invoice_id } = req.body;
     
     const body = razorpay_order_id + "|" + razorpay_payment_id;
-    const expectedSignature = crypto
-        .createHmac('sha256', process.env.RAZORPAY_KEY_SECRET)
-        .update(body.toString())
-        .digest('hex');
+    const expectedSignature = crypto.createHmac('sha256', process.env.RAZORPAY_KEY_SECRET).update(body.toString()).digest('hex');
 
     if (expectedSignature === razorpay_signature) {
-        // Update Invoice Status
         await pool.query('UPDATE Invoices SET Status = ?, PaymentGateway = ? WHERE ID = ?', ['PAID', 'Razorpay', invoice_id]);
         res.json({ status: 'success' });
     } else {
@@ -375,16 +303,26 @@ app.post('/api/payment/initiate', (req, res) => {
         return res.status(500).send("Error: CCAvenue credentials missing in .env file");
     }
 
-    // Prepare CCAvenue Request
     const redirectUrl = `${req.protocol}://${req.get('host')}/api/payment/ccavResponseHandler`;
     const cancelUrl = `${req.protocol}://${req.get('host')}/api/payment/ccavResponseHandler`;
 
-    const params = `merchant_id=${merchantId}&order_id=${order_id}&currency=${currency}&amount=${amount}&redirect_url=${redirectUrl}&cancel_url=${cancelUrl}&language=EN&billing_name=${billing_name}&billing_address=${billing_address}&billing_email=${email}&billing_tel=${billing_tel}`;
+    // Use URLSearchParams to ensure proper encoding of all fields (including spaces)
+    const paramsMap = new URLSearchParams();
+    paramsMap.append('merchant_id', merchantId);
+    paramsMap.append('order_id', order_id);
+    paramsMap.append('currency', currency);
+    paramsMap.append('amount', amount);
+    paramsMap.append('redirect_url', redirectUrl);
+    paramsMap.append('cancel_url', cancelUrl);
+    paramsMap.append('language', 'EN');
+    paramsMap.append('billing_name', billing_name);
+    paramsMap.append('billing_address', billing_address);
+    paramsMap.append('billing_email', email);
+    paramsMap.append('billing_tel', billing_tel);
 
-    // Encrypt
+    const params = paramsMap.toString(); // Standard URL encoded string
     const encRequest = ccav.encrypt(params, workingKey);
 
-    // Serve Auto-Submit Form
     const form = `
         <html>
         <head><title>Redirecting to Payment...</title></head>
@@ -412,10 +350,10 @@ app.post('/api/payment/ccavResponseHandler', async (req, res) => {
         decrypted = ccav.decrypt(encResp, workingKey);
     } catch(e) {
         console.error("CCAvenue Decryption Failed:", e);
+        // Fail gracefully
         return res.send("<script>window.close();</script>");
     }
     
-    // Parse response string: "order_id=123&tracking_id=...&order_status=Success..."
     const params = new URLSearchParams(decrypted);
     const orderStatus = params.get('order_status');
     const orderId = params.get('order_id');
@@ -424,17 +362,15 @@ app.post('/api/payment/ccavResponseHandler', async (req, res) => {
 
     if (orderStatus === 'Success') {
         await pool.query('UPDATE Invoices SET Status = ?, PaymentGateway = ? WHERE ID = ?', ['PAID', 'CCAvenue', orderId]);
-        // Post message to parent window (Frontend) to update UI
-        htmlResponse = `<script>window.opener.postMessage('PAYMENT_SUCCESS', '*'); window.close();</script>`;
+        htmlResponse = `<script>if(window.opener){window.opener.postMessage('PAYMENT_SUCCESS', '*');} window.close();</script>`;
     } else {
         await pool.query('UPDATE Invoices SET Status = ? WHERE ID = ?', ['FAILED', orderId]);
-        htmlResponse = `<script>window.opener.postMessage('PAYMENT_CANCEL', '*'); window.close();</script>`;
+        htmlResponse = `<script>if(window.opener){window.opener.postMessage('PAYMENT_CANCEL', '*');} window.close();</script>`;
     }
 
     res.send(htmlResponse);
 });
 
-// --- Start Server ---
 app.listen(PORT, () => {
     console.log(`Server running on http://localhost:${PORT}`);
 });
