@@ -20,6 +20,75 @@ const dbConfig = {
     port: process.env.DB_PORT ? Number(process.env.DB_PORT) : 3306
 };
 
+// --- Helper Mappers ---
+
+const mapInvoiceToFrontend = (i) => {
+    if (!i) return null;
+    return {
+        id: i.ID,
+        invoiceNumber: i.InvoiceNumber,
+        type: i.Type,
+        date: i.Date ? new Date(i.Date).toISOString().split('T')[0] : '',
+        dueDate: i.DueDate ? new Date(i.DueDate).toISOString().split('T')[0] : '',
+        template: i.Template,
+        brandColor: i.BrandColor,
+        logoUrl: i.LogoUrl,
+        sellerName: i.SellerName,
+        businessName: i.BusinessName,
+        sellerAddress: i.SellerAddress,
+        sellerGstin: i.SellerGstin,
+        sellerEmail: i.SellerEmail,
+        sellerPhone: i.SellerPhone,
+        buyerName: i.BuyerName,
+        buyerContactPerson: i.BuyerContactPerson,
+        buyerEmail: i.BuyerEmail,
+        buyerPhone: i.BuyerPhone,
+        buyerAddress: i.BuyerAddress,
+        buyerShippingAddress: i.BuyerShippingAddress,
+        placeOfSupply: i.PlaceOfSupply,
+        buyerPinCode: i.BuyerPinCode,
+        resourceSection: i.ResourceSection,
+        resourceName: i.ResourceName,
+        subtotal: Number(i.Subtotal),
+        taxRate: Number(i.TaxRate),
+        taxAmount: Number(i.TaxAmount),
+        total: Number(i.Total),
+        currency: i.Currency,
+        status: i.Status,
+        paymentGateway: i.PaymentGateway,
+        notes: i.Notes
+    };
+};
+
+const mapItemToFrontend = (i) => ({
+    id: i.ID,
+    name: i.ItemName,
+    description: i.Description,
+    quantity: Number(i.Quantity),
+    rate: Number(i.Rate),
+    amount: Number(i.Amount)
+});
+
+const mapProductToFrontend = (p) => ({
+    id: p.ID,
+    name: p.Name,
+    description: p.Description,
+    rate: Number(p.Rate)
+});
+
+const mapCustomerToFrontend = (c) => ({
+    id: c.ID,
+    name: c.Name,
+    contactPerson: c.ContactPerson,
+    email: c.Email,
+    phone: c.Phone,
+    address: c.Address,
+    shippingAddress: c.ShippingAddress,
+    gstin: c.Gstin,
+    placeOfSupply: c.PlaceOfSupply,
+    pinCode: c.PinCode
+});
+
 // --- Invoices ---
 
 app.get('/api/invoices', async (req, res) => {
@@ -27,7 +96,7 @@ app.get('/api/invoices', async (req, res) => {
     try {
         connection = await mysql.createConnection(dbConfig);
         const [rows] = await connection.execute('SELECT * FROM Invoices ORDER BY Date DESC');
-        res.json(rows);
+        res.json(rows.map(mapInvoiceToFrontend));
     } catch (error) {
         console.error(error);
         res.status(500).json({ error: error.message });
@@ -43,18 +112,10 @@ app.get('/api/invoices/:id', async (req, res) => {
         const [rows] = await connection.execute('SELECT * FROM Invoices WHERE ID = ?', [req.params.id]);
         if (rows.length === 0) return res.status(404).json({ error: 'Invoice not found' });
         
-        const invoice = rows[0];
+        const invoice = mapInvoiceToFrontend(rows[0]);
         const [items] = await connection.execute('SELECT * FROM LineItems WHERE InvoiceID = ?', [req.params.id]);
         
-        // Map DB columns to frontend structure if needed (lowercase/camelCase)
-        invoice.items = items.map(i => ({
-            id: i.ID,
-            name: i.ItemName,
-            description: i.Description,
-            quantity: Number(i.Quantity),
-            rate: Number(i.Rate),
-            amount: Number(i.Amount)
-        }));
+        invoice.items = items.map(mapItemToFrontend);
 
         res.json(invoice);
     } catch (error) {
@@ -164,7 +225,7 @@ app.get('/api/products', async (req, res) => {
     try {
         connection = await mysql.createConnection(dbConfig);
         const [rows] = await connection.execute('SELECT * FROM Products');
-        res.json(rows.map(r => ({ ...r, rate: Number(r.Rate) })));
+        res.json(rows.map(mapProductToFrontend));
     } catch (error) {
         res.status(500).json({ error: error.message });
     } finally {
@@ -215,7 +276,7 @@ app.get('/api/customers', async (req, res) => {
     try {
         connection = await mysql.createConnection(dbConfig);
         const [rows] = await connection.execute('SELECT * FROM Customers');
-        res.json(rows);
+        res.json(rows.map(mapCustomerToFrontend));
     } catch (error) {
         res.status(500).json({ error: error.message });
     } finally {
@@ -272,7 +333,21 @@ app.get('/api/settings/seller', async (req, res) => {
     try {
         connection = await mysql.createConnection(dbConfig);
         const [rows] = await connection.execute('SELECT * FROM SellerProfile LIMIT 1');
-        res.json(rows[0] || {});
+        const s = rows[0];
+        if (s) {
+            res.json({
+                sellerName: s.SellerName,
+                businessName: s.BusinessName,
+                sellerAddress: s.SellerAddress,
+                sellerGstin: s.SellerGstin,
+                sellerEmail: s.SellerEmail,
+                sellerPhone: s.SellerPhone,
+                logoUrl: s.LogoUrl,
+                brandColor: s.BrandColor
+            });
+        } else {
+            res.json({});
+        }
     } catch (error) {
         res.status(500).json({ error: error.message });
     } finally {
