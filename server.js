@@ -11,8 +11,8 @@ const PORT = process.env.PORT || 3000;
 
 // --- Middleware ---
 app.use(cors());
-app.use(bodyParser.json({ limit: '10mb' }));
-app.use(bodyParser.urlencoded({ extended: true, limit: '10mb' }));
+app.use(express.json({ limit: '50mb' })); // Increased limit for Base64 PDFs/Images
+app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
 // --- Database Connection ---
 const dbConfig = {
@@ -28,7 +28,7 @@ const dbConfig = {
 
 const pool = mysql.createPool(dbConfig);
 
-// Test DB Connection
+// Test DB Connection on Start
 (async () => {
     try {
         const connection = await pool.getConnection();
@@ -36,19 +36,19 @@ const pool = mysql.createPool(dbConfig);
         connection.release();
     } catch (err) {
         console.error('❌ Database Connection Failed:', err.message);
-        console.log('   Ensure MySQL is running and .env is configured.');
+        console.log('   Ensure MySQL is running and .env is configured correctly.');
     }
 })();
 
 // --- Payment Gateways Configuration ---
 
-// Razorpay
 const razorpay = new Razorpay({
     key_id: process.env.RAZORPAY_KEY_ID || 'rzp_test_placeholder',
     key_secret: process.env.RAZORPAY_KEY_SECRET || 'secret_placeholder'
 });
 
-// CCAvenue Crypto Utils (Inline to avoid file dependency issues)
+// CCAvenue Crypto Utils (AES-128-CBC)
+// Matches the standard Node.js Integration Kit logic
 const ccav = {
     encrypt: function (plainText, workingKey) {
         const m = crypto.createHash('md5');
@@ -75,11 +75,20 @@ const ccav = {
 // --- API Routes ---
 
 // 1. PRODUCTS
+// We use aliases (AS) to ensure JSON returns camelCase keys matching the frontend interfaces
 app.get('/api/products', async (req, res) => {
     try {
-        const [rows] = await pool.query('SELECT * FROM Products');
+        const [rows] = await pool.query(`
+            SELECT 
+                ID as id, 
+                Name as name, 
+                Description as description, 
+                Rate as rate 
+            FROM Products
+        `);
         res.json(rows);
     } catch (err) {
+        console.error(err);
         res.status(500).json({ error: err.message });
     }
 });
@@ -110,9 +119,23 @@ app.delete('/api/products/:id', async (req, res) => {
 // 2. CUSTOMERS
 app.get('/api/customers', async (req, res) => {
     try {
-        const [rows] = await pool.query('SELECT * FROM Customers');
+        const [rows] = await pool.query(`
+            SELECT 
+                ID as id, 
+                Name as name, 
+                ContactPerson as contactPerson, 
+                Email as email, 
+                Phone as phone, 
+                Address as address, 
+                ShippingAddress as shippingAddress, 
+                Gstin as gstin, 
+                PlaceOfSupply as placeOfSupply, 
+                PinCode as pinCode 
+            FROM Customers
+        `);
         res.json(rows);
     } catch (err) {
+        console.error(err);
         res.status(500).json({ error: err.message });
     }
 });
@@ -146,16 +169,28 @@ app.delete('/api/customers/:id', async (req, res) => {
 // 3. SELLER SETTINGS
 app.get('/api/settings/seller', async (req, res) => {
     try {
-        const [rows] = await pool.query('SELECT * FROM SellerProfile LIMIT 1');
+        const [rows] = await pool.query(`
+            SELECT 
+                ID as id,
+                SellerName as sellerName,
+                BusinessName as businessName,
+                SellerAddress as sellerAddress,
+                SellerGstin as sellerGstin,
+                SellerEmail as sellerEmail,
+                SellerPhone as sellerPhone,
+                LogoUrl as logoUrl,
+                BrandColor as brandColor
+            FROM SellerProfile LIMIT 1
+        `);
         res.json(rows.length > 0 ? rows[0] : {});
     } catch (err) {
+        console.error(err);
         res.status(500).json({ error: err.message });
     }
 });
 
 app.post('/api/settings/seller', async (req, res) => {
     const { sellerName, businessName, sellerAddress, sellerGstin, sellerEmail, sellerPhone, logoUrl, brandColor } = req.body;
-    // We use a fixed ID 'default' or similar logic to ensure only one profile exists
     const fixedId = 'profile_default';
     try {
         await pool.query(`
@@ -175,9 +210,12 @@ app.post('/api/settings/seller', async (req, res) => {
 // 4. INVOICES
 app.get('/api/invoices', async (req, res) => {
     try {
+        // We select * here because Invoice data structure is large.
+        // The frontend service handles the mapping from TitleCase (DB) to camelCase (JS).
         const [rows] = await pool.query('SELECT * FROM Invoices ORDER BY Date DESC');
         res.json(rows);
     } catch (err) {
+        console.error(err);
         res.status(500).json({ error: err.message });
     }
 });
@@ -188,11 +226,22 @@ app.get('/api/invoices/:id', async (req, res) => {
         if (invoices.length === 0) return res.status(404).json({ error: 'Not found' });
 
         const invoice = invoices[0];
-        const [items] = await pool.query('SELECT * FROM LineItems WHERE InvoiceID = ?', [invoice.ID]);
+        // Fetch Line Items
+        const [items] = await pool.query(`
+            SELECT 
+                ID as id,
+                ItemName as name,
+                Description as description,
+                Quantity as quantity,
+                Rate as rate,
+                Amount as amount
+            FROM LineItems WHERE InvoiceID = ?
+        `, [invoice.ID]);
         
         invoice.items = items;
         res.json(invoice);
     } catch (err) {
+        console.error(err);
         res.status(500).json({ error: err.message });
     }
 });
@@ -226,11 +275,19 @@ app.post('/api/invoices', async (req, res) => {
             inv.resourceSection, inv.resourceName, inv.subtotal, inv.taxRate, inv.taxAmount, inv.total, inv.currency, inv.status, inv.paymentGateway, inv.notes
         ]);
 
-        // 2. Replace Line Items
+        // 2. Replace Line Items (Delete all and re-insert)
         await connection.query('DELETE FROM LineItems WHERE InvoiceID = ?', [inv.id]);
         
         if (inv.items && inv.items.length > 0) {
-            const itemValues = inv.items.map(item => [item.id, inv.id, item.name, item.description, item.quantity, item.rate, item.amount]);
+            const itemValues = inv.items.map(item => [
+                item.id, 
+                inv.id, 
+                item.name, 
+                item.description, 
+                item.quantity, 
+                item.rate, 
+                item.amount
+            ]);
             await connection.query('INSERT INTO LineItems (ID, InvoiceID, ItemName, Description, Quantity, Rate, Amount) VALUES ?', [itemValues]);
         }
 
@@ -248,23 +305,24 @@ app.post('/api/invoices', async (req, res) => {
 
 app.delete('/api/invoices/:id', async (req, res) => {
     try {
-        // Due to CASCADE in schema, deleting invoice deletes line items
         await pool.query('DELETE FROM Invoices WHERE ID = ?', [req.params.id]);
         res.json({ success: true });
     } catch (err) {
+        console.error(err);
         res.status(500).json({ error: err.message });
     }
 });
 
-// 5. NOTIFICATION (Stub)
+// 5. NOTIFICATION (Stub for now)
 app.post('/api/notify', async (req, res) => {
     const { to, subject, body, attachments } = req.body;
-    console.log(`\n📧 [EMAIL STUB] To: ${to}`);
-    console.log(`   Subject: ${subject}`);
-    console.log(`   Attachments: ${attachments ? attachments.length + ' files' : 'None'}`);
+    console.log(`\n================ EMAIL SIMULATION ================`);
+    console.log(`To: ${to}`);
+    console.log(`Subject: ${subject}`);
+    if(attachments) console.log(`Attachment: ${attachments.length} file(s)`);
+    console.log(`==================================================\n`);
     
-    // In a real app, use nodemailer here. 
-    // Since it's not in package.json, we simply log and return success.
+    // Integration point: Use nodemailer here to send real emails
     
     res.json({ success: true, message: "Email logged to console" });
 });
@@ -276,7 +334,7 @@ app.post('/api/payment/razorpay/create-order', async (req, res) => {
     const { amount, currency, receipt } = req.body;
     try {
         const order = await razorpay.orders.create({
-            amount: Math.round(amount * 100), // convert to paise/cents
+            amount: Math.round(amount * 100), // convert to smallest currency unit (paise)
             currency: currency || 'INR',
             receipt: receipt
         });
@@ -314,16 +372,19 @@ app.post('/api/payment/initiate', (req, res) => {
     const workingKey = process.env.CCAV_WORKING_KEY;
 
     if (!merchantId || !accessCode || !workingKey) {
-        return res.status(500).send("CCAvenue credentials missing in .env");
+        return res.status(500).send("Error: CCAvenue credentials missing in .env file");
     }
 
+    // Prepare CCAvenue Request
     const redirectUrl = `${req.protocol}://${req.get('host')}/api/payment/ccavResponseHandler`;
     const cancelUrl = `${req.protocol}://${req.get('host')}/api/payment/ccavResponseHandler`;
 
     const params = `merchant_id=${merchantId}&order_id=${order_id}&currency=${currency}&amount=${amount}&redirect_url=${redirectUrl}&cancel_url=${cancelUrl}&language=EN&billing_name=${billing_name}&billing_address=${billing_address}&billing_email=${email}&billing_tel=${billing_tel}`;
 
+    // Encrypt
     const encRequest = ccav.encrypt(params, workingKey);
 
+    // Serve Auto-Submit Form
     const form = `
         <html>
         <head><title>Redirecting to Payment...</title></head>
@@ -345,10 +406,16 @@ app.post('/api/payment/initiate', (req, res) => {
 app.post('/api/payment/ccavResponseHandler', async (req, res) => {
     const { encResp } = req.body;
     const workingKey = process.env.CCAV_WORKING_KEY;
-    const decrypted = ccav.decrypt(encResp, workingKey);
     
-    // Parse the decrypted string to find status and order_id
-    // Format: order_id=123&tracking_id=...&order_status=Success...
+    let decrypted = '';
+    try {
+        decrypted = ccav.decrypt(encResp, workingKey);
+    } catch(e) {
+        console.error("CCAvenue Decryption Failed:", e);
+        return res.send("<script>window.close();</script>");
+    }
+    
+    // Parse response string: "order_id=123&tracking_id=...&order_status=Success..."
     const params = new URLSearchParams(decrypted);
     const orderStatus = params.get('order_status');
     const orderId = params.get('order_id');
@@ -357,6 +424,7 @@ app.post('/api/payment/ccavResponseHandler', async (req, res) => {
 
     if (orderStatus === 'Success') {
         await pool.query('UPDATE Invoices SET Status = ?, PaymentGateway = ? WHERE ID = ?', ['PAID', 'CCAvenue', orderId]);
+        // Post message to parent window (Frontend) to update UI
         htmlResponse = `<script>window.opener.postMessage('PAYMENT_SUCCESS', '*'); window.close();</script>`;
     } else {
         await pool.query('UPDATE Invoices SET Status = ? WHERE ID = ?', ['FAILED', orderId]);
