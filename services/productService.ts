@@ -37,7 +37,16 @@ export const ProductService = {
     try {
       const response = await fetch(`${API_BASE}/products?_t=${Date.now()}`);
       if (!response.ok) throw new Error("Failed to load products");
-      return await response.json();
+      const data = await response.json();
+      
+      // Normalize keys (MySQL returns TitleCase, Frontend expects camelCase)
+      return Array.isArray(data) ? data.map((p: any) => ({
+        id: p.id || p.ID,
+        name: p.name || p.Name,
+        description: p.description || p.Description,
+        rate: Number(p.rate || p.Rate || 0)
+      })) : [];
+
     } catch (e) {
       console.warn("⚠️ Backend unavailable. Loading Products from LocalStorage.", e);
       return LocalStorageProductService.getAll();

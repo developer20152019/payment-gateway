@@ -36,7 +36,22 @@ export const CustomerService = {
     try {
       const response = await fetch(`${API_BASE}/customers?_t=${Date.now()}`);
       if (!response.ok) throw new Error("Failed to load customers");
-      return await response.json();
+      const data = await response.json();
+
+      // Normalize keys (MySQL returns TitleCase, Frontend expects camelCase)
+      return Array.isArray(data) ? data.map((c: any) => ({
+        id: c.id || c.ID,
+        name: c.name || c.Name,
+        contactPerson: c.contactPerson || c.ContactPerson,
+        email: c.email || c.Email,
+        phone: c.phone || c.Phone,
+        address: c.address || c.Address,
+        shippingAddress: c.shippingAddress || c.ShippingAddress,
+        gstin: c.gstin || c.Gstin,
+        placeOfSupply: c.placeOfSupply || c.PlaceOfSupply,
+        pinCode: c.pinCode || c.PinCode
+      })) : [];
+
     } catch (e) {
       console.warn("⚠️ Backend unavailable. Loading Customers from LocalStorage.", e);
       return LocalStorageCustomerService.getAll();

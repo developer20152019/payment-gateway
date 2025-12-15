@@ -6,6 +6,55 @@ import { InvoiceData, PaymentStatus, PaymentGateway } from '../types';
 const API_BASE = '/api'; 
 const LOCAL_STORAGE_KEY = 'paylink_invoices';
 
+// --- Helper to normalize DB response (TitleCase) to Frontend (camelCase) ---
+const mapInvoiceFromBackend = (data: any): InvoiceData => {
+  const items = Array.isArray(data.items) ? data.items : (Array.isArray(data.Items) ? data.Items : []);
+  
+  return {
+    id: data.id || data.ID,
+    invoiceNumber: data.invoiceNumber || data.InvoiceNumber,
+    type: data.type || data.Type || 'INVOICE',
+    date: data.date || data.Date,
+    dueDate: data.dueDate || data.DueDate,
+    template: data.template || data.Template || 'modern',
+    brandColor: data.brandColor || data.BrandColor || '#4f46e5',
+    logoUrl: data.logoUrl || data.LogoUrl,
+    sellerName: data.sellerName || data.SellerName,
+    businessName: data.businessName || data.BusinessName,
+    sellerAddress: data.sellerAddress || data.SellerAddress,
+    sellerGstin: data.sellerGstin || data.SellerGstin,
+    sellerEmail: data.sellerEmail || data.SellerEmail,
+    sellerPhone: data.sellerPhone || data.SellerPhone,
+    buyerName: data.buyerName || data.BuyerName,
+    buyerContactPerson: data.buyerContactPerson || data.BuyerContactPerson,
+    buyerEmail: data.buyerEmail || data.BuyerEmail,
+    buyerPhone: data.buyerPhone || data.BuyerPhone,
+    buyerAddress: data.buyerAddress || data.BuyerAddress,
+    buyerShippingAddress: data.buyerShippingAddress || data.BuyerShippingAddress,
+    placeOfSupply: data.placeOfSupply || data.PlaceOfSupply,
+    buyerPinCode: data.buyerPinCode || data.BuyerPinCode,
+    resourceSection: data.resourceSection || data.ResourceSection,
+    resourceName: data.resourceName || data.ResourceName,
+    subtotal: Number(data.subtotal || data.Subtotal || 0),
+    taxRate: Number(data.taxRate || data.TaxRate || 0),
+    taxAmount: Number(data.taxAmount || data.TaxAmount || 0),
+    total: Number(data.total || data.Total || 0),
+    currency: data.currency || data.Currency || 'INR',
+    status: data.status || data.Status || 'PENDING',
+    paymentGateway: data.paymentGateway || data.PaymentGateway,
+    notes: data.notes || data.Notes,
+    // Map Items if they exist
+    items: items.map((item: any) => ({
+        id: item.id || item.ID,
+        name: item.name || item.ItemName || '', // DB column is ItemName
+        description: item.description || item.Description || '',
+        quantity: Number(item.quantity || item.Quantity || 0),
+        rate: Number(item.rate || item.Rate || 0),
+        amount: Number(item.amount || item.Amount || 0)
+    }))
+  };
+};
+
 // --- LocalStorage Fallback Implementation ---
 const LocalStorageService = {
   getAll: (): InvoiceData[] => {
@@ -69,7 +118,8 @@ export const InvoiceService = {
       const response = await fetch(`${API_BASE}/invoices/${id}?_t=${Date.now()}`);
       if (response.status === 404) return undefined;
       if (!response.ok) throw new Error("Failed to fetch invoice");
-      return await response.json();
+      const data = await response.json();
+      return mapInvoiceFromBackend(data);
     } catch (e) {
       console.warn("⚠️ Backend unavailable. Fetching from LocalStorage.", e);
       return LocalStorageService.getInvoiceById(id);
@@ -80,7 +130,8 @@ export const InvoiceService = {
     try {
       const response = await fetch(`${API_BASE}/invoices?_t=${Date.now()}`);
       if (!response.ok) throw new Error("Failed to load invoices");
-      return await response.json();
+      const data = await response.json();
+      return Array.isArray(data) ? data.map(mapInvoiceFromBackend) : [];
     } catch (e) {
       console.warn("⚠️ Backend unavailable. Loading from LocalStorage.", e);
       return LocalStorageService.getAllInvoices();
@@ -104,7 +155,9 @@ export const InvoiceService = {
       // 1. Try to fetch current state from backend (Force fresh fetch with timestamp)
       const response = await fetch(`${API_BASE}/invoices/${id}?_t=${Date.now()}`);
       if (response.ok) {
-        const invoice: InvoiceData = await response.json();
+        const rawData = await response.json();
+        const invoice = mapInvoiceFromBackend(rawData);
+        
         invoice.status = status;
         if (gateway) {
             invoice.paymentGateway = gateway;

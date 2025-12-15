@@ -23,9 +23,22 @@ export const SettingsService = {
       const response = await fetch(`${API_BASE}/seller?_t=${Date.now()}`);
       if (!response.ok) throw new Error("Failed to load settings");
       const data = await response.json();
+      
       // Check if object is empty (no record found)
       if (Object.keys(data).length === 0) return null;
-      return data;
+
+      // Normalize keys
+      return {
+        sellerName: data.sellerName || data.SellerName,
+        businessName: data.businessName || data.BusinessName,
+        sellerAddress: data.sellerAddress || data.SellerAddress,
+        sellerGstin: data.sellerGstin || data.SellerGstin,
+        sellerEmail: data.sellerEmail || data.SellerEmail,
+        sellerPhone: data.sellerPhone || data.SellerPhone,
+        logoUrl: data.logoUrl || data.LogoUrl,
+        brandColor: data.brandColor || data.BrandColor || '#4f46e5'
+      };
+
     } catch (e) {
       console.warn("⚠️ Backend unavailable. Loading Settings from LocalStorage.", e);
       return LocalStorageSettingsService.getSellerProfile();
