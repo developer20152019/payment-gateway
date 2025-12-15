@@ -25,7 +25,12 @@
                 (ID, InvoiceNumber, Type, Date, DueDate, Template, BrandColor, LogoUrl, SellerName, BusinessName, SellerAddress, 
                 SellerGstin, SellerEmail, SellerPhone, BuyerName, BuyerContactPerson, BuyerEmail, BuyerPhone, BuyerAddress, BuyerShippingAddress, PlaceOfSupply, BuyerPinCode,
                 ResourceSection, ResourceName, Subtotal, TaxRate, TaxAmount, Total, Currency, Status, PaymentGateway, Notes)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (
+                    ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 
+                    ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 
+                    ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 
+                    ?, ?
+                )
             `, [
                 invoice.id, invoice.invoiceNumber, invoice.type || 'INVOICE', invoice.date, invoice.dueDate, invoice.template, invoice.brandColor, invoice.logoUrl || '',
                 invoice.sellerName, invoice.businessName, invoice.sellerAddress, invoice.sellerGstin || '', invoice.sellerEmail, invoice.sellerPhone,
