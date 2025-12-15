@@ -11,7 +11,7 @@ interface NotificationState {
 }
 
 const ViewInvoice: React.FC = () => {
-  const { id } = useParams<{ id: string }>();
+  const { id } = useParams();
   const navigate = useNavigate();
   const location = useLocation();
   

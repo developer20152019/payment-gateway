@@ -90,6 +90,10 @@ const ResponsiveItemsTable: React.FC<{
  * TEMPLATE: MODERN (ONLY SUPPORTED TEMPLATE)
  */
 export const InvoicePreview: React.FC<Props> = ({ invoice }) => {
+  const hasShippingAddress = invoice.buyerShippingAddress && 
+                             invoice.buyerShippingAddress.trim() !== '' && 
+                             invoice.buyerShippingAddress !== invoice.buyerAddress;
+
   return (
     <div className="bg-white w-full p-4 md:p-12 invoice-shadow relative overflow-hidden min-h-full">
       
@@ -125,31 +129,57 @@ export const InvoicePreview: React.FC<Props> = ({ invoice }) => {
       </div>
 
       {/* Addresses */}
-      <div className="flex flex-col md:flex-row gap-4 md:gap-6 mb-6 md:mb-10">
-        <div className="flex-1 bg-gray-50 p-4 md:p-6 rounded-sm border-l-4" style={{ borderColor: invoice.brandColor }}>
-          <h3 className="text-xs font-bold uppercase tracking-wider text-gray-500 mb-2">Billed From</h3>
-          <div className="text-sm space-y-1 text-gray-600">
-             <p className="font-bold text-gray-900">{invoice.businessName}</p>
-             <p>{invoice.sellerName}</p>
-             <p className="whitespace-pre-line">{invoice.sellerAddress}</p>
-             <div className="mt-3 pt-2 border-t border-gray-200">
-               {invoice.sellerGstin && <p><span className="font-medium">GSTIN:</span> {invoice.sellerGstin}</p>}
-               <p><span className="font-medium">Email:</span> <span className="break-all">{invoice.sellerEmail}</span></p>
-               <p><span className="font-medium">Phone:</span> {invoice.sellerPhone}</p>
-             </div>
-          </div>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6 mb-6 md:mb-10">
+        
+        {/* Seller & Buyer Columns */}
+        <div className="space-y-4">
+            {/* Seller */}
+            <div className="bg-gray-50 p-4 md:p-6 rounded-sm border-l-4" style={{ borderColor: invoice.brandColor }}>
+              <h3 className="text-xs font-bold uppercase tracking-wider text-gray-500 mb-2">Billed From</h3>
+              <div className="text-sm space-y-1 text-gray-600">
+                <p className="font-bold text-gray-900">{invoice.businessName}</p>
+                <p>{invoice.sellerName}</p>
+                <p className="whitespace-pre-line">{invoice.sellerAddress}</p>
+                <div className="mt-3 pt-2 border-t border-gray-200">
+                  {invoice.sellerGstin && <p><span className="font-medium">GSTIN:</span> {invoice.sellerGstin}</p>}
+                  <p><span className="font-medium">Email:</span> <span className="break-all">{invoice.sellerEmail}</span></p>
+                  <p><span className="font-medium">Phone:</span> {invoice.sellerPhone}</p>
+                </div>
+              </div>
+            </div>
         </div>
 
-        <div className="flex-1 bg-gray-50 p-4 md:p-6 rounded-sm border-l-4 border-gray-300">
-          <h3 className="text-xs font-bold uppercase tracking-wider text-gray-500 mb-2">Billed To</h3>
-          <div className="text-sm space-y-1 text-gray-600">
-             <p className="font-bold text-gray-900">{invoice.buyerName}</p>
-             <p className="whitespace-pre-line">{invoice.buyerAddress}</p>
-             <div className="mt-3 pt-2 border-t border-gray-200">
-                <p><span className="font-medium">Email:</span> <span className="break-all">{invoice.buyerEmail}</span></p>
-                <p><span className="font-medium">Phone:</span> {invoice.buyerPhone}</p>
-             </div>
-          </div>
+        <div className="space-y-4">
+            {/* Buyer */}
+            <div className="bg-gray-50 p-4 md:p-6 rounded-sm border-l-4 border-gray-300">
+              <h3 className="text-xs font-bold uppercase tracking-wider text-gray-500 mb-2">Billed To</h3>
+              <div className="text-sm space-y-1 text-gray-600">
+                <p className="font-bold text-gray-900">{invoice.buyerName}</p>
+                {invoice.buyerContactPerson && (
+                    <p className="italic text-gray-500">Attn: {invoice.buyerContactPerson}</p>
+                )}
+                <p className="whitespace-pre-line">{invoice.buyerAddress}</p>
+                {invoice.buyerPinCode && <p className="text-gray-500">Pin: {invoice.buyerPinCode}</p>}
+                
+                {/* Place of Supply inline */}
+                {invoice.placeOfSupply && (
+                    <p className="mt-1"><span className="font-medium text-xs uppercase text-gray-400">Place of Supply:</span> {invoice.placeOfSupply}</p>
+                )}
+
+                <div className="mt-3 pt-2 border-t border-gray-200">
+                    <p><span className="font-medium">Email:</span> <span className="break-all">{invoice.buyerEmail}</span></p>
+                    <p><span className="font-medium">Phone:</span> {invoice.buyerPhone}</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Separate Shipping if exists */}
+            {hasShippingAddress && (
+                <div className="bg-white p-4 rounded-sm border border-dashed border-gray-300">
+                    <h3 className="text-xs font-bold uppercase tracking-wider text-gray-500 mb-2">Shipped To</h3>
+                    <p className="text-sm text-gray-600 whitespace-pre-line">{invoice.buyerShippingAddress}</p>
+                </div>
+            )}
         </div>
       </div>
 

@@ -2,7 +2,15 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { InvoiceData, PaymentStatus, DocumentType } from '../types';
 import { InvoiceService } from '../services/invoiceService';
-import { PlusIcon, DocumentTextIcon, TrashIcon, MagnifyingGlassIcon, LinkIcon, CheckIcon, XMarkIcon, FunnelIcon, ArrowUpIcon, ArrowDownIcon, BanknotesIcon, PencilIcon, TagIcon, ClipboardDocumentListIcon, UsersIcon, Cog6ToothIcon } from '@heroicons/react/24/outline';
+import { PlusIcon, DocumentTextIcon, TrashIcon, MagnifyingGlassIcon, LinkIcon, CheckIcon, XMarkIcon, FunnelIcon, ArrowUpIcon, ArrowDownIcon, BanknotesIcon, PencilIcon, TagIcon, ClipboardDocumentListIcon, UsersIcon, Cog6ToothIcon, MapPinIcon } from '@heroicons/react/24/outline';
+
+const INDIAN_STATES = [
+  "Andhra Pradesh", "Arunachal Pradesh", "Assam", "Bihar", "Chhattisgarh", "Goa", "Gujarat", "Haryana", 
+  "Himachal Pradesh", "Jharkhand", "Karnataka", "Kerala", "Madhya Pradesh", "Maharashtra", "Manipur", 
+  "Meghalaya", "Mizoram", "Nagaland", "Odisha", "Punjab", "Rajasthan", "Sikkim", "Tamil Nadu", "Telangana", 
+  "Tripura", "Uttar Pradesh", "Uttarakhand", "West Bengal", "Andaman and Nicobar Islands", "Chandigarh", 
+  "Dadra and Nagar Haveli and Daman and Diu", "Delhi", "Jammu and Kashmir", "Ladakh", "Lakshadweep", "Puducherry"
+];
 
 const Dashboard: React.FC = () => {
   const navigate = useNavigate();
@@ -12,7 +20,8 @@ const Dashboard: React.FC = () => {
   // Filter States
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('ALL');
-  const [typeFilter, setTypeFilter] = useState<string>('ALL'); // New Type Filter
+  const [typeFilter, setTypeFilter] = useState<string>('ALL');
+  const [placeOfSupplyFilter, setPlaceOfSupplyFilter] = useState<string>('ALL');
   const [dateRange, setDateRange] = useState({ start: '', end: '' });
   
   // Resource Filters
@@ -50,7 +59,6 @@ const Dashboard: React.FC = () => {
     e.stopPropagation();
     const url = `${window.location.origin}${window.location.pathname}#/view/${id}`;
     
-    // Robust Copy Function with Fallback
     const copyToClipboard = (text: string) => {
         if (navigator.clipboard && navigator.clipboard.writeText) {
             navigator.clipboard.writeText(text).then(() => {
@@ -69,19 +77,14 @@ const Dashboard: React.FC = () => {
         try {
             const textArea = document.createElement("textarea");
             textArea.value = text;
-            
-            // Ensure it's not visible but part of DOM to be selectable
             textArea.style.position = "fixed";
             textArea.style.left = "-9999px";
             textArea.style.top = "0";
-            
             document.body.appendChild(textArea);
             textArea.focus();
             textArea.select();
-            
             const successful = document.execCommand('copy');
             document.body.removeChild(textArea);
-            
             if (successful) {
                 setCopiedId(id);
                 setTimeout(() => setCopiedId(null), 2000);
@@ -119,7 +122,6 @@ const Dashboard: React.FC = () => {
     );
 
     try {
-        // Pass 'CASH' as the gateway
         await InvoiceService.updateStatus(id, PaymentStatus.PAID, 'CASH');
     } catch (error) {
         console.error("Failed to update status:", error);
@@ -174,16 +176,15 @@ const Dashboard: React.FC = () => {
     const matchesSearch = (
       invoice.invoiceNumber.toLowerCase().includes(query) ||
       invoice.buyerName.toLowerCase().includes(query) ||
-      invoice.buyerEmail.toLowerCase().includes(query) ||
+      (invoice.buyerEmail || '').toLowerCase().includes(query) ||
       invoice.total.toString().includes(query) ||
       invoice.status.toLowerCase().includes(query) ||
       invoice.date.includes(query)
     );
 
     const matchesStatus = statusFilter === 'ALL' || invoice.status === statusFilter;
-    
-    // Type Filter
     const matchesType = typeFilter === 'ALL' || invoice.type === typeFilter;
+    const matchesPlaceOfSupply = placeOfSupplyFilter === 'ALL' || (invoice.placeOfSupply && invoice.placeOfSupply === placeOfSupplyFilter);
 
     // Resource Filter
     const matchesResourceSection = !resourceSectionFilter || (invoice.resourceSection || '').toLowerCase().includes(resourceSectionFilter.toLowerCase());
@@ -202,7 +203,7 @@ const Dashboard: React.FC = () => {
         matchesEnd = invoiceDate <= endDate;
     }
 
-    return matchesSearch && matchesStatus && matchesType && matchesResourceSection && matchesResourceName && matchesStart && matchesEnd;
+    return matchesSearch && matchesStatus && matchesType && matchesPlaceOfSupply && matchesResourceSection && matchesResourceName && matchesStart && matchesEnd;
   });
 
   // Sort Logic
@@ -219,12 +220,13 @@ const Dashboard: React.FC = () => {
     setSearchQuery('');
     setStatusFilter('ALL');
     setTypeFilter('ALL');
+    setPlaceOfSupplyFilter('ALL');
     setDateRange({ start: '', end: '' });
     setResourceSectionFilter('');
     setResourceNameFilter('');
   };
 
-  const hasActiveFilters = searchQuery || statusFilter !== 'ALL' || typeFilter !== 'ALL' || dateRange.start || dateRange.end || resourceSectionFilter || resourceNameFilter;
+  const hasActiveFilters = searchQuery || statusFilter !== 'ALL' || typeFilter !== 'ALL' || placeOfSupplyFilter !== 'ALL' || dateRange.start || dateRange.end || resourceSectionFilter || resourceNameFilter;
 
   return (
     <div className="min-h-screen bg-gray-50 pb-12">
@@ -305,7 +307,7 @@ const Dashboard: React.FC = () => {
              <div className="space-y-3">
                  <div className="grid grid-cols-1 md:grid-cols-12 gap-3">
                     {/* 1. Search */}
-                    <div className="md:col-span-4 relative">
+                    <div className="md:col-span-3 relative">
                         <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                         <MagnifyingGlassIcon className="h-4 w-4 text-gray-400" />
                         </div>
@@ -352,8 +354,23 @@ const Dashboard: React.FC = () => {
                         </div>
                     </div>
 
-                    {/* 4. Date Range */}
-                    <div className="md:col-span-4 flex gap-2 items-center">
+                    {/* 4. Place of Supply Filter */}
+                    <div className="md:col-span-2 relative">
+                        <div className="absolute inset-y-0 left-0 pl-2 flex items-center pointer-events-none">
+                            <MapPinIcon className="h-4 w-4 text-gray-400" />
+                        </div>
+                        <select
+                            className="block w-full pl-8 pr-3 py-2 border border-gray-300 rounded-lg text-sm bg-white text-gray-700 focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 transition-all appearance-none"
+                            value={placeOfSupplyFilter}
+                            onChange={(e) => setPlaceOfSupplyFilter(e.target.value)}
+                        >
+                            <option value="ALL">All States</option>
+                            {INDIAN_STATES.map(s => <option key={s} value={s}>{s}</option>)}
+                        </select>
+                    </div>
+
+                    {/* 5. Date Range */}
+                    <div className="md:col-span-3 flex gap-2 items-center">
                         <input
                             type="date"
                             className="block w-full border border-gray-300 rounded-lg text-sm p-2 text-gray-600 focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 transition-all"
@@ -437,7 +454,7 @@ const Dashboard: React.FC = () => {
                               </td>
                               <td className="px-6 py-4">
                                   <div className="font-medium text-gray-900">{inv.buyerName}</div>
-                                  <div className="text-xs text-gray-500">{inv.buyerEmail}</div>
+                                  {inv.placeOfSupply && <div className="text-xs text-gray-400 mt-0.5">{inv.placeOfSupply}</div>}
                               </td>
                               <td className="px-6 py-4 text-gray-600 whitespace-nowrap">
                                   {inv.date}

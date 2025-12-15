@@ -20,10 +20,14 @@ export interface Product {
 export interface Customer {
   id: string;
   name: string;
+  contactPerson?: string; 
   email: string;
   phone: string;
   address: string;
+  shippingAddress?: string; 
   gstin?: string;
+  placeOfSupply?: string; 
+  pinCode?: string;
 }
 
 export interface SellerProfile {
@@ -41,8 +45,8 @@ export interface LineItem {
   id: string;
   name: string; 
   description: string;
-  quantity: number | string; // Changed to allow intermediate input states
-  rate: number | string;     // Changed to allow intermediate input states (e.g. "10.")
+  quantity: number | string; 
+  rate: number | string;     
   amount: number;
 }
 
@@ -68,9 +72,13 @@ export interface InvoiceData {
 
   // Buyer Info
   buyerName: string;
+  buyerContactPerson?: string; 
   buyerEmail: string;
   buyerPhone: string;
   buyerAddress: string;
+  buyerShippingAddress?: string; 
+  placeOfSupply?: string; 
+  buyerPinCode?: string; // New
 
   // Internal Resource Info (Not shown on Invoice)
   resourceSection?: string;
@@ -106,6 +114,9 @@ export interface CCAvenueRequest {
   billing_country?: string;
   billing_tel: string;
   billing_email: string;
+  delivery_name?: string;
+  delivery_address?: string;
+  delivery_tel?: string;
   merchant_param1?: string;
 }
 

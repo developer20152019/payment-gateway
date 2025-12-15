@@ -1,11 +1,19 @@
 import React, { useEffect, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import { InvoiceData, LineItem, PaymentStatus, Product, DocumentType, Customer } from '../types';
 import { PhotoIcon, PlusIcon, TrashIcon, DocumentTextIcon, ArrowPathIcon, ChevronLeftIcon, CheckCircleIcon, ChatBubbleLeftRightIcon, EyeIcon, UserPlusIcon, XMarkIcon } from '@heroicons/react/24/outline';
 import { InvoiceService } from '../services/invoiceService';
 import { ProductService } from '../services/productService';
 import { CustomerService } from '../services/customerService';
 import { SettingsService } from '../services/settingsService';
+
+const INDIAN_STATES = [
+  "Andhra Pradesh", "Arunachal Pradesh", "Assam", "Bihar", "Chhattisgarh", "Goa", "Gujarat", "Haryana", 
+  "Himachal Pradesh", "Jharkhand", "Karnataka", "Kerala", "Madhya Pradesh", "Maharashtra", "Manipur", 
+  "Meghalaya", "Mizoram", "Nagaland", "Odisha", "Punjab", "Rajasthan", "Sikkim", "Tamil Nadu", "Telangana", 
+  "Tripura", "Uttar Pradesh", "Uttarakhand", "West Bengal", "Andaman and Nicobar Islands", "Chandigarh", 
+  "Dadra and Nagar Haveli and Daman and Diu", "Delhi", "Jammu and Kashmir", "Ladakh", "Lakshadweep", "Puducherry"
+];
 
 const generateInvoiceNumber = () => {
   const date = new Date();
@@ -36,9 +44,13 @@ const getInitialInvoice = (): InvoiceData => ({
   sellerEmail: '',
   sellerPhone: '',
   buyerName: '',
+  buyerContactPerson: '',
   buyerEmail: '',
   buyerPhone: '',
   buyerAddress: '',
+  buyerShippingAddress: '',
+  placeOfSupply: '',
+  buyerPinCode: '',
   
   // Resource Fields (Internal)
   resourceSection: '',
@@ -58,8 +70,8 @@ const getInitialInvoice = (): InvoiceData => ({
 });
 
 const CreateInvoice: React.FC = () => {
+  const { id } = useParams();
   const navigate = useNavigate();
-  const { id } = useParams<{ id: string }>();
   
   const [invoice, setInvoice] = useState<InvoiceData>(getInitialInvoice);
   const [products, setProducts] = useState<Product[]>([]);
@@ -74,8 +86,10 @@ const CreateInvoice: React.FC = () => {
   // New Customer Modal State
   const [showAddCustomerModal, setShowAddCustomerModal] = useState(false);
   const [newCustomer, setNewCustomer] = useState<Customer>({
-      id: '', name: '', email: '', phone: '', address: '', gstin: ''
+      id: '', name: '', email: '', phone: '', address: '', gstin: '',
+      contactPerson: '', shippingAddress: '', placeOfSupply: '', pinCode: ''
   });
+  const [newCustomerSameAsBilling, setNewCustomerSameAsBilling] = useState(false);
 
   // Load Invoice and Products and Customers
   useEffect(() => {
@@ -100,7 +114,11 @@ const CreateInvoice: React.FC = () => {
                   resourceName: existingInvoice.resourceName || '',
                   paymentGateway: existingInvoice.paymentGateway || '',
                   type: existingInvoice.type || 'INVOICE',
-                  template: 'modern'
+                  template: 'modern',
+                  buyerContactPerson: existingInvoice.buyerContactPerson || '',
+                  buyerShippingAddress: existingInvoice.buyerShippingAddress || '',
+                  placeOfSupply: existingInvoice.placeOfSupply || '',
+                  buyerPinCode: existingInvoice.buyerPinCode || ''
               });
               setIsEditMode(true);
             } else {
@@ -209,14 +227,36 @@ const CreateInvoice: React.FC = () => {
           buyerName: customer.name,
           buyerEmail: customer.email,
           buyerPhone: customer.phone,
-          buyerAddress: customer.address
+          buyerAddress: customer.address,
+          buyerContactPerson: customer.contactPerson || '',
+          buyerShippingAddress: customer.shippingAddress || customer.address, // Default to billing if empty
+          placeOfSupply: customer.placeOfSupply || '',
+          buyerPinCode: customer.pinCode || ''
       }));
       setShowSuggestions(false);
   };
 
   // Add New Customer Logic
+  const handleNewCustomerAddressChange = (val: string) => {
+      setNewCustomer(prev => ({
+          ...prev, 
+          address: val, 
+          shippingAddress: newCustomerSameAsBilling ? val : prev.shippingAddress 
+      }));
+  };
+
+  const handleNewCustomerSameAsBillingChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+      const checked = e.target.checked;
+      setNewCustomerSameAsBilling(checked);
+      if (checked) {
+          setNewCustomer(prev => ({ ...prev, shippingAddress: prev.address }));
+      } else {
+          setNewCustomer(prev => ({ ...prev, shippingAddress: '' }));
+      }
+  };
+
   const handleSaveNewCustomer = async (e: React.MouseEvent) => {
-      e.preventDefault(); // Prevent any form submission
+      e.preventDefault(); 
       
       if (!newCustomer.name || newCustomer.name.trim() === '') {
           alert("Customer Name is required");
@@ -229,32 +269,25 @@ const CreateInvoice: React.FC = () => {
           email: newCustomer.email?.trim() || '',
           phone: newCustomer.phone?.trim() || '',
           address: newCustomer.address?.trim() || '',
-          gstin: newCustomer.gstin?.trim() || ''
+          gstin: newCustomer.gstin?.trim() || '',
+          contactPerson: newCustomer.contactPerson?.trim() || '',
+          placeOfSupply: newCustomer.placeOfSupply || '',
+          pinCode: newCustomer.pinCode?.trim() || '',
+          shippingAddress: newCustomerSameAsBilling ? newCustomer.address?.trim() : newCustomer.shippingAddress?.trim() || ''
       };
 
       try {
           await CustomerService.saveCustomer(custToSave);
-          
-          // Optimistic update of local list to ensure it appears immediately in suggestions
           setCustomers(prev => [...prev, custToSave]);
+          
+          handleCustomerSelect(custToSave);
 
-          // Also try to re-fetch from server to be sure
-          CustomerService.getAllCustomers().then(updatedList => {
-              if(updatedList && updatedList.length > 0) setCustomers(updatedList);
-          });
-
-          // Auto-select the new customer in the form
-          setInvoice(prev => ({
-              ...prev,
-              buyerName: custToSave.name,
-              buyerEmail: custToSave.email,
-              buyerPhone: custToSave.phone,
-              buyerAddress: custToSave.address
-          }));
-
-          // Close and reset
           setShowAddCustomerModal(false);
-          setNewCustomer({ id: '', name: '', email: '', phone: '', address: '', gstin: '' });
+          setNewCustomer({ 
+              id: '', name: '', email: '', phone: '', address: '', gstin: '', 
+              contactPerson: '', shippingAddress: '', placeOfSupply: '', pinCode: '' 
+          });
+          setNewCustomerSameAsBilling(false);
       } catch (error) {
           console.error("Failed to save customer", error);
           alert("Failed to save customer. Please try again.");
@@ -358,9 +391,7 @@ const CreateInvoice: React.FC = () => {
             navigate(`/view/${invoiceToSave.id}`);
         } else {
             // Pass state to ViewInvoice to trigger auto-email
-            navigate(`/view/${invoiceToSave.id}`, { 
-                state: { autoSendEmail: true, emailType: 'CREATED' } 
-            });
+            navigate(`/view/${invoiceToSave.id}`, { state: { autoSendEmail: true, emailType: 'CREATED' } });
         }
 
     } catch (error) {
@@ -393,7 +424,7 @@ const CreateInvoice: React.FC = () => {
       {showAddCustomerModal && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
            <div className="absolute inset-0 bg-gray-900/60 backdrop-blur-sm" onClick={() => setShowAddCustomerModal(false)}></div>
-           <div className="relative bg-white rounded-xl shadow-2xl w-full max-w-md p-6 animate-fade-in-up">
+           <div className="relative bg-white rounded-xl shadow-2xl w-full max-w-lg p-6 animate-fade-in-up max-h-[90vh] overflow-y-auto">
               <div className="flex justify-between items-center mb-6">
                   <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
                       <UserPlusIcon className="w-5 h-5 text-indigo-600" />
@@ -405,51 +436,111 @@ const CreateInvoice: React.FC = () => {
               </div>
               
               <div className="space-y-4">
-                  <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Name *</label>
-                      <input 
-                          type="text" 
-                          className="w-full border border-gray-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
-                          placeholder="Client Company Name"
-                          value={newCustomer.name}
-                          onChange={e => setNewCustomer({...newCustomer, name: e.target.value})}
-                      />
+                  <div className="grid grid-cols-2 gap-4">
+                      <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Company *</label>
+                          <input 
+                              type="text" 
+                              className="w-full border border-gray-300 rounded-lg p-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
+                              placeholder="Company Name"
+                              value={newCustomer.name}
+                              onChange={e => setNewCustomer({...newCustomer, name: e.target.value})}
+                          />
+                      </div>
+                      <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Contact Person</label>
+                          <input 
+                              type="text" 
+                              className="w-full border border-gray-300 rounded-lg p-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
+                              placeholder="Name"
+                              value={newCustomer.contactPerson || ''}
+                              onChange={e => setNewCustomer({...newCustomer, contactPerson: e.target.value})}
+                          />
+                      </div>
                   </div>
-                  <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
-                      <input 
-                          type="email" 
-                          className="w-full border border-gray-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
-                          placeholder="client@email.com"
-                          value={newCustomer.email}
-                          onChange={e => setNewCustomer({...newCustomer, email: e.target.value})}
-                      />
+
+                  <div className="grid grid-cols-2 gap-4">
+                      <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
+                          <input 
+                              type="email" 
+                              className="w-full border border-gray-300 rounded-lg p-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
+                              placeholder="email@example.com"
+                              value={newCustomer.email}
+                              onChange={e => setNewCustomer({...newCustomer, email: e.target.value})}
+                          />
+                      </div>
+                      <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Phone</label>
+                          <input 
+                              type="tel" 
+                              className="w-full border border-gray-300 rounded-lg p-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
+                              placeholder="+91..."
+                              value={newCustomer.phone}
+                              onChange={e => setNewCustomer({...newCustomer, phone: e.target.value})}
+                          />
+                      </div>
                   </div>
+
                   <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Phone</label>
-                      <input 
-                          type="tel" 
-                          className="w-full border border-gray-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
-                          placeholder="+91..."
-                          value={newCustomer.phone}
-                          onChange={e => setNewCustomer({...newCustomer, phone: e.target.value})}
-                      />
-                  </div>
-                  <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Address</label>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Billing Address</label>
                       <textarea 
                           rows={2}
-                          className="w-full border border-gray-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none resize-none"
+                          className="w-full border border-gray-300 rounded-lg p-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none resize-none"
                           placeholder="Full Address"
                           value={newCustomer.address}
-                          onChange={e => setNewCustomer({...newCustomer, address: e.target.value})}
+                          onChange={e => handleNewCustomerAddressChange(e.target.value)}
                       />
                   </div>
+
+                  <div>
+                        <div className="flex justify-between items-center mb-1">
+                            <label className="block text-sm font-medium text-gray-700">Shipping Address</label>
+                            <label className="flex items-center gap-2 cursor-pointer">
+                                <input type="checkbox" className="w-3.5 h-3.5 text-indigo-600 rounded border-gray-300 focus:ring-indigo-500" checked={newCustomerSameAsBilling} onChange={handleNewCustomerSameAsBillingChange} />
+                                <span className="text-xs text-gray-500">Same as Billing</span>
+                            </label>
+                        </div>
+                        <textarea 
+                            rows={2}
+                            disabled={newCustomerSameAsBilling}
+                            className={`w-full border border-gray-300 rounded-lg p-2 text-sm resize-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none ${newCustomerSameAsBilling ? 'bg-gray-100 text-gray-500' : 'bg-white'}`}
+                            placeholder="Shipping Location"
+                            value={newCustomerSameAsBilling ? newCustomer.address : (newCustomer.shippingAddress || '')}
+                            onChange={e => setNewCustomer({...newCustomer, shippingAddress: e.target.value})}
+                        />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                      <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Place of Supply</label>
+                          <select 
+                              className="w-full border border-gray-300 rounded-lg p-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none bg-white"
+                              value={newCustomer.placeOfSupply || ''}
+                              onChange={e => setNewCustomer({...newCustomer, placeOfSupply: e.target.value})}
+                          >
+                              <option value="">Select State</option>
+                              {INDIAN_STATES.map(s => <option key={s} value={s}>{s}</option>)}
+                          </select>
+                      </div>
+                      <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Pin Code</label>
+                          <input 
+                              type="text" 
+                              className="w-full border border-gray-300 rounded-lg p-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
+                              placeholder="000000"
+                              maxLength={6}
+                              value={newCustomer.pinCode || ''}
+                              onChange={e => setNewCustomer({...newCustomer, pinCode: e.target.value})}
+                          />
+                      </div>
+                  </div>
+
                   <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">GSTIN (Optional)</label>
                       <input 
                           type="text" 
-                          className="w-full border border-gray-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
+                          className="w-full border border-gray-300 rounded-lg p-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none uppercase"
                           placeholder="GSTIN..."
                           value={newCustomer.gstin}
                           onChange={e => setNewCustomer({...newCustomer, gstin: e.target.value})}
@@ -458,8 +549,9 @@ const CreateInvoice: React.FC = () => {
                   <button 
                       type="button"
                       onClick={handleSaveNewCustomer}
-                      className="w-full py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-lg transition-colors mt-2"
+                      className="w-full py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-lg transition-colors mt-2 flex items-center justify-center gap-2"
                   >
+                      <CheckCircleIcon className="w-5 h-5" />
                       Save & Select Customer
                   </button>
               </div>
@@ -678,8 +770,8 @@ const CreateInvoice: React.FC = () => {
                 <div className="relative">
                     <input
                         type="text"
-                        placeholder="Client Name"
-                        className="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm border p-2"
+                        placeholder="Client Company Name"
+                        className="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm border p-2 font-bold"
                         value={invoice.buyerName}
                         onChange={(e) => {
                             handleChange('buyerName', e.target.value);
@@ -696,7 +788,7 @@ const CreateInvoice: React.FC = () => {
                                     key={c.id} 
                                     className="px-4 py-2 hover:bg-indigo-50 cursor-pointer text-sm text-gray-700"
                                     onMouseDown={(e) => {
-                                      e.preventDefault(); // Prevent blur before click
+                                      e.preventDefault(); 
                                       handleCustomerSelect(c);
                                     }}
                                 >
@@ -707,27 +799,79 @@ const CreateInvoice: React.FC = () => {
                         </ul>
                     )}
                 </div>
+                
                 <input
-                  type="email"
-                  placeholder="Client Email"
+                  type="text"
+                  placeholder="Contact Person (Optional)"
                   className="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm border p-2"
-                  value={invoice.buyerEmail}
-                  onChange={(e) => handleChange('buyerEmail', e.target.value)}
+                  value={invoice.buyerContactPerson || ''}
+                  onChange={(e) => handleChange('buyerContactPerson', e.target.value)}
                 />
-                <input
-                  type="tel"
-                  placeholder="Client Phone"
-                  className="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm border p-2"
-                  value={invoice.buyerPhone}
-                  onChange={(e) => handlePhoneChange('buyerPhone', e.target.value)}
-                />
-                <textarea
-                  placeholder="Client Address"
-                  rows={3}
-                  className="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm border p-2"
-                  value={invoice.buyerAddress}
-                  onChange={(e) => handleChange('buyerAddress', e.target.value)}
-                />
+
+                <div className="grid grid-cols-2 gap-4">
+                    <input
+                      type="email"
+                      placeholder="Client Email"
+                      className="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm border p-2"
+                      value={invoice.buyerEmail}
+                      onChange={(e) => handleChange('buyerEmail', e.target.value)}
+                    />
+                    <input
+                      type="tel"
+                      placeholder="Client Phone"
+                      className="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm border p-2"
+                      value={invoice.buyerPhone}
+                      onChange={(e) => handlePhoneChange('buyerPhone', e.target.value)}
+                    />
+                </div>
+
+                <div className="space-y-1">
+                    <label className="text-xs text-gray-500 font-medium ml-1">Billing Address</label>
+                    <textarea
+                      placeholder="Billing Address"
+                      rows={2}
+                      className="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm border p-2 resize-none"
+                      value={invoice.buyerAddress}
+                      onChange={(e) => handleChange('buyerAddress', e.target.value)}
+                    />
+                </div>
+
+                <div className="space-y-1">
+                    <label className="text-xs text-gray-500 font-medium ml-1">Shipping Address</label>
+                    <textarea
+                      placeholder="Shipping Address"
+                      rows={2}
+                      className="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm border p-2 resize-none"
+                      value={invoice.buyerShippingAddress || ''}
+                      onChange={(e) => handleChange('buyerShippingAddress', e.target.value)}
+                    />
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-1">
+                        <label className="text-xs text-gray-500 font-medium ml-1">Place of Supply</label>
+                        <select
+                            className="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm border p-2 bg-white"
+                            value={invoice.placeOfSupply || ''}
+                            onChange={(e) => handleChange('placeOfSupply', e.target.value)}
+                        >
+                            <option value="">Select State</option>
+                            {INDIAN_STATES.map(s => <option key={s} value={s}>{s}</option>)}
+                        </select>
+                    </div>
+                    <div className="space-y-1">
+                        <label className="text-xs text-gray-500 font-medium ml-1">Pin Code</label>
+                        <input
+                            type="text"
+                            placeholder="Pin Code"
+                            className="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm border p-2"
+                            value={invoice.buyerPinCode || ''}
+                            onChange={(e) => handleChange('buyerPinCode', e.target.value)}
+                            maxLength={6}
+                        />
+                    </div>
+                </div>
+
               </div>
             </div>
           </div>

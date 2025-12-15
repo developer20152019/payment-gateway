@@ -2,7 +2,7 @@
  * UNIFIED SERVER (Node.js / Express)
  * 
  * Features:
- * 1. Secure SQL Server Persistence (CRUD for Invoices & Products)
+ * 1. Secure MySQL Database Persistence (CRUD for Invoices & Products)
  * 2. CCAvenue Payment Integration (AES-128-CBC)
  * 3. Razorpay Payment Integration
  * 4. Email Notifications (Nodemailer)
@@ -16,12 +16,12 @@ try {
 }
 
 // --- DEPENDENCY CHECK ---
-let express, cors, sql, bodyParser, qs, Razorpay, crypto, nodemailer;
+let express, cors, mysql, bodyParser, qs, Razorpay, crypto, nodemailer;
 
 try {
     express = require('express');
     cors = require('cors');
-    sql = require('mssql');
+    mysql = require('mysql2/promise');
     bodyParser = require('body-parser');
     qs = require('querystring');
     crypto = require('crypto');
@@ -174,9 +174,9 @@ app.post('/api/payment/callback', async (req, res) => {
     console.log(`CCAvenue Callback: Order ${orderId} is ${orderStatus}`);
 
     // Update DB if successful
-    if (sql.connected && orderStatus === 'Success') {
+    if (pool && orderStatus === 'Success') {
         try { 
-            await sql.query`UPDATE Invoices SET Status = 'PAID', PaymentGateway = 'CCAvenue' WHERE ID = ${orderId}`; 
+            await pool.execute('UPDATE Invoices SET Status = ?, PaymentGateway = ? WHERE ID = ?', ['PAID', 'CCAvenue', orderId]); 
         } catch (dbErr) {
             console.error("DB Update Failed:", dbErr);
         }
@@ -236,9 +236,9 @@ app.post('/api/payment/razorpay/verify', async (req, res) => {
         .digest("hex");
 
     if (expectedSignature === razorpay_signature) {
-        if (sql.connected && invoice_id) {
+        if (pool && invoice_id) {
             try { 
-                await sql.query`UPDATE Invoices SET Status = 'PAID', PaymentGateway = 'Razorpay' WHERE ID = ${invoice_id}`; 
+                await pool.execute('UPDATE Invoices SET Status = ?, PaymentGateway = ? WHERE ID = ?', ['PAID', 'Razorpay', invoice_id]); 
             } catch (dbErr) {}
         }
         res.json({ status: "success" });
@@ -283,73 +283,75 @@ app.post('/api/notify', async (req, res) => {
 });
 
 // ==========================================
-// SQL DATABASE ENDPOINTS
+// MYSQL DATABASE CONFIG
 // ==========================================
 
-// Use environment variables for SQL connection if available
-const sqlConfig = {
-  user: process.env.DB_USER,
-  password: process.env.DB_PASSWORD,
-  database: process.env.DB_NAME || 'PayLinkDB',
-  server: process.env.DB_SERVER || '(localdb)\\MSSQLLocalDB',
-  port: process.env.DB_PORT ? Number(process.env.DB_PORT) : undefined,
-  pool: {
-    max: 10,
-    min: 0,
-    idleTimeoutMillis: 30000
-  },
-  options: {
-    encrypt: true, // Use true for Azure/LocalDB usually, unless self-hosted without SSL
-    trustServerCertificate: true
-  }
+const dbConfig = {
+    host: process.env.DB_SERVER || 'localhost',
+    user: process.env.DB_USER || 'root',
+    password: process.env.DB_PASSWORD || '',
+    database: process.env.DB_NAME || 'PayLinkDB',
+    port: process.env.DB_PORT ? Number(process.env.DB_PORT) : 3306,
+    waitForConnections: true,
+    connectionLimit: 10,
+    queueLimit: 0
 };
 
-sql.connect(sqlConfig).then(() => {
-    console.log("✅ Connected to SQL Server");
-}).catch(err => {
-    console.log("⚠️ SQL Server Connection Failed. Running in Offline Mode.", err.message);
-});
+let pool;
+
+try {
+    pool = mysql.createPool(dbConfig);
+    console.log("✅ MySQL Pool Created");
+} catch (err) {
+    console.log("⚠️ MySQL Connection Failed:", err.message);
+}
 
 // --- HELPER MAPPERS ---
-const mapToInvoice = (record, items = []) => ({
-    id: record.ID,
-    invoiceNumber: record.InvoiceNumber,
-    type: record.Type || 'INVOICE',
-    date: record.Date ? record.Date.toISOString().split('T')[0] : '',
-    dueDate: record.DueDate ? record.DueDate.toISOString().split('T')[0] : '',
-    template: record.Template,
-    brandColor: record.BrandColor,
-    logoUrl: record.LogoUrl,
-    sellerName: record.SellerName,
-    businessName: record.BusinessName,
-    sellerAddress: record.SellerAddress,
-    sellerGstin: record.SellerGstin,
-    sellerEmail: record.SellerEmail,
-    sellerPhone: record.SellerPhone,
-    buyerName: record.BuyerName,
-    buyerEmail: record.BuyerEmail,
-    buyerPhone: record.BuyerPhone,
-    buyerAddress: record.BuyerAddress,
-    resourceSection: record.ResourceSection,
-    resourceName: record.ResourceName,
-    subtotal: record.Subtotal,
-    taxRate: record.TaxRate,
-    taxAmount: record.TaxAmount,
-    total: record.Total,
-    currency: record.Currency,
-    status: record.Status || 'PENDING',
-    paymentGateway: record.PaymentGateway || '',
-    notes: record.Notes,
-    items: items
-});
+const mapToInvoice = (record, items = []) => {
+    return {
+        id: record.ID,
+        invoiceNumber: record.InvoiceNumber,
+        type: record.Type || 'INVOICE',
+        date: record.Date instanceof Date ? record.Date.toISOString().split('T')[0] : record.Date,
+        dueDate: record.DueDate instanceof Date ? record.DueDate.toISOString().split('T')[0] : record.DueDate,
+        template: record.Template,
+        brandColor: record.BrandColor,
+        logoUrl: record.LogoUrl,
+        sellerName: record.SellerName,
+        businessName: record.BusinessName,
+        sellerAddress: record.SellerAddress,
+        sellerGstin: record.SellerGstin,
+        sellerEmail: record.SellerEmail,
+        sellerPhone: record.SellerPhone,
+        buyerName: record.BuyerName,
+        buyerContactPerson: record.BuyerContactPerson,
+        buyerEmail: record.BuyerEmail,
+        buyerPhone: record.BuyerPhone,
+        buyerAddress: record.BuyerAddress,
+        buyerShippingAddress: record.BuyerShippingAddress,
+        placeOfSupply: record.PlaceOfSupply,
+        buyerPinCode: record.BuyerPinCode,
+        resourceSection: record.ResourceSection,
+        resourceName: record.ResourceName,
+        subtotal: parseFloat(record.Subtotal),
+        taxRate: parseFloat(record.TaxRate),
+        taxAmount: parseFloat(record.TaxAmount),
+        total: parseFloat(record.Total),
+        currency: record.Currency,
+        status: record.Status || 'PENDING',
+        paymentGateway: record.PaymentGateway || '',
+        notes: record.Notes,
+        items: items
+    };
+};
 
 // --- SETTINGS ENDPOINTS ---
 app.get('/api/settings/seller', async (req, res) => {
-    if (!sql.connected) return res.status(503).json({ error: "Database unavailable" });
+    if (!pool) return res.status(503).json({ error: "Database unavailable" });
     try {
-        const result = await sql.query`SELECT * FROM SellerProfile WHERE ID = 'default'`;
-        if (result.recordset.length === 0) return res.json({}); // Return empty object if not set
-        const r = result.recordset[0];
+        const [rows] = await pool.execute('SELECT * FROM SellerProfile WHERE ID = ?', ['default']);
+        if (rows.length === 0) return res.json({});
+        const r = rows[0];
         res.json({
             sellerName: r.SellerName,
             businessName: r.BusinessName,
@@ -364,32 +366,23 @@ app.get('/api/settings/seller', async (req, res) => {
 });
 
 app.post('/api/settings/seller', async (req, res) => {
-    if (!sql.connected) return res.status(503).json({ error: "Database unavailable" });
+    if (!pool) return res.status(503).json({ error: "Database unavailable" });
     const s = req.body;
     try {
-        const request = new sql.Request();
-        request.input('id', sql.NVarChar, 'default');
-        request.input('sName', sql.NVarChar, s.sellerName || '');
-        request.input('bName', sql.NVarChar, s.businessName || '');
-        request.input('sAddr', sql.NVarChar, s.sellerAddress || '');
-        request.input('sGstin', sql.NVarChar, s.sellerGstin || '');
-        request.input('sEmail', sql.NVarChar, s.sellerEmail || '');
-        request.input('sPhone', sql.NVarChar, s.sellerPhone || '');
-        request.input('logo', sql.NVarChar, s.logoUrl || '');
-        request.input('color', sql.NVarChar, s.brandColor || '#4f46e5');
-
-        await request.query(`
-            MERGE SellerProfile AS target
-            USING (SELECT @id AS ID) AS source
-            ON (target.ID = source.ID)
-            WHEN MATCHED THEN
-                UPDATE SET SellerName=@sName, BusinessName=@bName, SellerAddress=@sAddr, 
-                           SellerGstin=@sGstin, SellerEmail=@sEmail, SellerPhone=@sPhone, 
-                           LogoUrl=@logo, BrandColor=@color
-            WHEN NOT MATCHED THEN
-                INSERT (ID, SellerName, BusinessName, SellerAddress, SellerGstin, SellerEmail, SellerPhone, LogoUrl, BrandColor)
-                VALUES (@id, @sName, @bName, @sAddr, @sGstin, @sEmail, @sPhone, @logo, @color);
-        `);
+        // UPSERT for MySQL
+        const query = `
+            INSERT INTO SellerProfile 
+            (ID, SellerName, BusinessName, SellerAddress, SellerGstin, SellerEmail, SellerPhone, LogoUrl, BrandColor)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ON DUPLICATE KEY UPDATE
+            SellerName=VALUES(SellerName), BusinessName=VALUES(BusinessName), SellerAddress=VALUES(SellerAddress),
+            SellerGstin=VALUES(SellerGstin), SellerEmail=VALUES(SellerEmail), SellerPhone=VALUES(SellerPhone),
+            LogoUrl=VALUES(LogoUrl), BrandColor=VALUES(BrandColor)
+        `;
+        await pool.execute(query, [
+            'default', s.sellerName, s.businessName, s.sellerAddress, s.sellerGstin, 
+            s.sellerEmail, s.sellerPhone, s.logoUrl, s.brandColor || '#4f46e5'
+        ]);
         res.status(200).json({ message: "Settings saved" });
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
@@ -397,29 +390,29 @@ app.post('/api/settings/seller', async (req, res) => {
 // --- INVOICE ENDPOINTS ---
 
 app.get('/api/invoices', async (req, res) => {
-    if (!sql.connected) return res.status(503).json({ error: "Database unavailable" });
+    if (!pool) return res.status(503).json({ error: "Database unavailable" });
     try {
-        const result = await sql.query`SELECT * FROM Invoices ORDER BY Date DESC`;
-        const invoices = result.recordset.map(r => mapToInvoice(r, []));
+        const [rows] = await pool.execute('SELECT * FROM Invoices ORDER BY Date DESC');
+        const invoices = rows.map(r => mapToInvoice(r, []));
         res.json(invoices);
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 app.get('/api/invoices/:id', async (req, res) => {
-    if (!sql.connected) return res.status(503).json({ error: "Database unavailable" });
+    if (!pool) return res.status(503).json({ error: "Database unavailable" });
     try {
-        const result = await sql.query`SELECT * FROM Invoices WHERE ID = ${req.params.id}`;
-        if (result.recordset.length === 0) return res.status(404).json({ message: "Not Found" });
-        const invoiceRecord = result.recordset[0];
+        const [invRows] = await pool.execute('SELECT * FROM Invoices WHERE ID = ?', [req.params.id]);
+        if (invRows.length === 0) return res.status(404).json({ message: "Not Found" });
+        const invoiceRecord = invRows[0];
         
-        const itemsResult = await sql.query`SELECT * FROM LineItems WHERE InvoiceID = ${req.params.id}`;
-        const items = itemsResult.recordset.map(i => ({ 
+        const [itemRows] = await pool.execute('SELECT * FROM LineItems WHERE InvoiceID = ?', [req.params.id]);
+        const items = itemRows.map(i => ({ 
             id: i.ID, 
             name: i.ItemName || '',
             description: i.Description, 
-            quantity: i.Quantity, 
-            rate: i.Rate, 
-            amount: i.Amount 
+            quantity: parseFloat(i.Quantity), 
+            rate: parseFloat(i.Rate), 
+            amount: parseFloat(i.Amount) 
         }));
         
         res.json(mapToInvoice(invoiceRecord, items));
@@ -427,204 +420,164 @@ app.get('/api/invoices/:id', async (req, res) => {
 });
 
 app.post('/api/invoices', async (req, res) => {
-    if (!sql.connected) return res.status(503).json({ error: "Database unavailable" });
+    if (!pool) return res.status(503).json({ error: "Database unavailable" });
     const invoice = req.body;
-    const transaction = new sql.Transaction();
+    let connection;
     try {
-        await transaction.begin();
-        const request = new sql.Request(transaction);
-        
-        // Bind Inputs
-        request.input('id', sql.NVarChar, invoice.id);
-        request.input('invNum', sql.NVarChar, invoice.invoiceNumber);
-        request.input('type', sql.NVarChar, invoice.type || 'INVOICE');
-        request.input('date', sql.Date, invoice.date);
-        request.input('dueDate', sql.Date, invoice.dueDate);
-        request.input('template', sql.NVarChar, invoice.template);
-        request.input('brandColor', sql.NVarChar, invoice.brandColor);
-        request.input('logoUrl', sql.NVarChar, invoice.logoUrl || '');
-        request.input('sName', sql.NVarChar, invoice.sellerName);
-        request.input('bName', sql.NVarChar, invoice.businessName);
-        request.input('sAddr', sql.NVarChar, invoice.sellerAddress);
-        request.input('sGstin', sql.NVarChar, invoice.sellerGstin || '');
-        request.input('sEmail', sql.NVarChar, invoice.sellerEmail);
-        request.input('sPhone', sql.NVarChar, invoice.sellerPhone);
-        request.input('buyName', sql.NVarChar, invoice.buyerName);
-        request.input('buyEmail', sql.NVarChar, invoice.buyerEmail);
-        request.input('buyPhone', sql.NVarChar, invoice.buyerPhone);
-        request.input('buyAddr', sql.NVarChar, invoice.buyerAddress);
-        request.input('resSec', sql.NVarChar, invoice.resourceSection || '');
-        request.input('resName', sql.NVarChar, invoice.resourceName || '');
-        request.input('sub', sql.Decimal(18,2), invoice.subtotal || 0);
-        request.input('taxRate', sql.Decimal(5,2), invoice.taxRate || 0);
-        request.input('taxAmt', sql.Decimal(18,2), invoice.taxAmount || 0);
-        request.input('total', sql.Decimal(18,2), invoice.total || 0);
-        request.input('curr', sql.NVarChar, invoice.currency);
-        request.input('status', sql.NVarChar, invoice.status || 'PENDING');
-        request.input('pg', sql.NVarChar, invoice.paymentGateway || '');
-        request.input('notes', sql.NVarChar, invoice.notes || '');
+        connection = await pool.getConnection();
+        await connection.beginTransaction();
 
-        const check = await request.query(`SELECT ID FROM Invoices WHERE ID = @id`);
+        // Check exist
+        const [check] = await connection.execute('SELECT ID FROM Invoices WHERE ID = ?', [invoice.id]);
         
-        if (check.recordset.length > 0) {
+        if (check.length > 0) {
             // Update
-            await request.query(`
+            await connection.execute(`
                 UPDATE Invoices SET 
-                InvoiceNumber=@invNum, Type=@type, Date=@date, DueDate=@dueDate, Template=@template, BrandColor=@brandColor, LogoUrl=@logoUrl,
-                SellerName=@sName, BusinessName=@bName, SellerAddress=@sAddr, SellerGstin=@sGstin, SellerEmail=@sEmail, SellerPhone=@sPhone,
-                BuyerName=@buyName, BuyerEmail=@buyEmail, BuyerPhone=@buyPhone, BuyerAddress=@buyAddr, ResourceSection=@resSec, ResourceName=@resName,
-                Subtotal=@sub, TaxRate=@taxRate, TaxAmount=@taxAmt, Total=@total, Currency=@curr, Status=@status, PaymentGateway=@pg, Notes=@notes
-                WHERE ID = @id
-            `);
+                InvoiceNumber=?, Type=?, Date=?, DueDate=?, Template=?, BrandColor=?, LogoUrl=?,
+                SellerName=?, BusinessName=?, SellerAddress=?, SellerGstin=?, SellerEmail=?, SellerPhone=?,
+                BuyerName=?, BuyerContactPerson=?, BuyerEmail=?, BuyerPhone=?, BuyerAddress=?, BuyerShippingAddress=?, PlaceOfSupply=?, BuyerPinCode=?,
+                ResourceSection=?, ResourceName=?,
+                Subtotal=?, TaxRate=?, TaxAmount=?, Total=?, Currency=?, Status=?, PaymentGateway=?, Notes=?
+                WHERE ID=?
+            `, [
+                invoice.invoiceNumber, invoice.type || 'INVOICE', invoice.date, invoice.dueDate, invoice.template, invoice.brandColor, invoice.logoUrl || '',
+                invoice.sellerName, invoice.businessName, invoice.sellerAddress, invoice.sellerGstin || '', invoice.sellerEmail, invoice.sellerPhone,
+                invoice.buyerName, invoice.buyerContactPerson || '', invoice.buyerEmail, invoice.buyerPhone, invoice.buyerAddress, invoice.buyerShippingAddress || '', invoice.placeOfSupply || '', invoice.buyerPinCode || '',
+                invoice.resourceSection || '', invoice.resourceName || '',
+                invoice.subtotal || 0, invoice.taxRate || 0, invoice.taxAmount || 0, invoice.total || 0, invoice.currency, invoice.status || 'PENDING', invoice.paymentGateway || '', invoice.notes || '',
+                invoice.id
+            ]);
         } else {
             // Insert
-            await request.query(`
+            await connection.execute(`
                 INSERT INTO Invoices 
                 (ID, InvoiceNumber, Type, Date, DueDate, Template, BrandColor, LogoUrl, SellerName, BusinessName, SellerAddress, 
-                SellerGstin, SellerEmail, SellerPhone, BuyerName, BuyerEmail, BuyerPhone, BuyerAddress, ResourceSection, ResourceName, Subtotal, 
-                TaxRate, TaxAmount, Total, Currency, Status, PaymentGateway, Notes)
-                VALUES 
-                (@id, @invNum, @type, @date, @dueDate, @template, @brandColor, @logoUrl, @sName, @bName, @sAddr, 
-                @sGstin, @sEmail, @sPhone, @buyName, @buyEmail, @buyPhone, @buyAddr, @resSec, @resName, @sub, 
-                @taxRate, @taxAmt, @total, @curr, @status, @pg, @notes)
-            `);
+                SellerGstin, SellerEmail, SellerPhone, BuyerName, BuyerContactPerson, BuyerEmail, BuyerPhone, BuyerAddress, BuyerShippingAddress, PlaceOfSupply, BuyerPinCode,
+                ResourceSection, ResourceName, Subtotal, TaxRate, TaxAmount, Total, Currency, Status, PaymentGateway, Notes)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            `, [
+                invoice.id, invoice.invoiceNumber, invoice.type || 'INVOICE', invoice.date, invoice.dueDate, invoice.template, invoice.brandColor, invoice.logoUrl || '',
+                invoice.sellerName, invoice.businessName, invoice.sellerAddress, invoice.sellerGstin || '', invoice.sellerEmail, invoice.sellerPhone,
+                invoice.buyerName, invoice.buyerContactPerson || '', invoice.buyerEmail, invoice.buyerPhone, invoice.buyerAddress, invoice.buyerShippingAddress || '', invoice.placeOfSupply || '', invoice.buyerPinCode || '',
+                invoice.resourceSection || '', invoice.resourceName || '',
+                invoice.subtotal || 0, invoice.taxRate || 0, invoice.taxAmount || 0, invoice.total || 0, invoice.currency, invoice.status || 'PENDING', invoice.paymentGateway || '', invoice.notes || ''
+            ]);
         }
 
         // Line Items
-        await request.query(`DELETE FROM LineItems WHERE InvoiceID = @id`);
+        await connection.execute('DELETE FROM LineItems WHERE InvoiceID = ?', [invoice.id]);
+        
         for (const item of invoice.items) {
-            const itemReq = new sql.Request(transaction);
-            itemReq.input('i_id', sql.NVarChar, item.id);
-            itemReq.input('inv_id', sql.NVarChar, invoice.id);
-            itemReq.input('name', sql.NVarChar, item.name || ''); 
-            itemReq.input('desc', sql.NVarChar, item.description);
-            // Ensure numeric defaults to prevent SQL errors on empty strings
-            itemReq.input('qty', sql.Decimal(18,2), item.quantity || 0); 
-            itemReq.input('rate', sql.Decimal(18,2), item.rate || 0);
-            itemReq.input('amt', sql.Decimal(18,2), item.amount || 0);
-            
-            await itemReq.query(`INSERT INTO LineItems (ID, InvoiceID, ItemName, Description, Quantity, Rate, Amount) VALUES (@i_id, @inv_id, @name, @desc, @qty, @rate, @amt)`);
+            await connection.execute(`
+                INSERT INTO LineItems (ID, InvoiceID, ItemName, Description, Quantity, Rate, Amount) 
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+            `, [
+                item.id, invoice.id, item.name || '', item.description, item.quantity || 0, item.rate || 0, item.amount || 0
+            ]);
         }
         
-        await transaction.commit();
+        await connection.commit();
         res.status(200).json({ message: "Saved successfully" });
     } catch (err) {
-        if (transaction._aborted === false) await transaction.rollback();
+        if (connection) await connection.rollback();
         console.error("SQL Error during Save:", err);
         res.status(500).json({ error: err.message });
+    } finally {
+        if (connection) connection.release();
     }
 });
 
 app.delete('/api/invoices/:id', async (req, res) => {
-    if (!sql.connected) return res.status(503).json({ error: "Database unavailable" });
-    const transaction = new sql.Transaction();
+    if (!pool) return res.status(503).json({ error: "Database unavailable" });
+    let connection;
     try {
-        await transaction.begin();
-        const request = new sql.Request(transaction);
-        request.input('id', sql.NVarChar, req.params.id);
-        await request.query(`DELETE FROM LineItems WHERE InvoiceID = @id`);
-        await request.query(`DELETE FROM Invoices WHERE ID = @id`);
-        await transaction.commit();
+        connection = await pool.getConnection();
+        await connection.beginTransaction();
+        await connection.execute('DELETE FROM LineItems WHERE InvoiceID = ?', [req.params.id]);
+        await connection.execute('DELETE FROM Invoices WHERE ID = ?', [req.params.id]);
+        await connection.commit();
         res.status(200).json({ message: "Deleted successfully" });
     } catch (err) {
-        if (transaction._aborted === false) await transaction.rollback();
+        if (connection) await connection.rollback();
         res.status(500).json({ error: err.message });
+    } finally {
+        if (connection) connection.release();
     }
 });
 
 // ... [PRODUCT ENDPOINTS] ...
 app.get('/api/products', async (req, res) => {
-    if (!sql.connected) return res.status(503).json({ error: "Database unavailable" });
+    if (!pool) return res.status(503).json({ error: "Database unavailable" });
     try {
-        const result = await sql.query`SELECT * FROM Products ORDER BY Name ASC`;
-        const products = result.recordset.map(r => ({
-            id: r.ID, name: r.Name, description: r.Description, rate: r.Rate
+        const [rows] = await pool.execute('SELECT * FROM Products ORDER BY Name ASC');
+        const products = rows.map(r => ({
+            id: r.ID, name: r.Name, description: r.Description, rate: parseFloat(r.Rate)
         }));
         res.json(products);
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 app.post('/api/products', async (req, res) => {
-    if (!sql.connected) return res.status(503).json({ error: "Database unavailable" });
+    if (!pool) return res.status(503).json({ error: "Database unavailable" });
     const { id, name, description, rate } = req.body;
     try {
-        const request = new sql.Request();
-        request.input('id', sql.NVarChar, id);
-        request.input('name', sql.NVarChar, name);
-        request.input('desc', sql.NVarChar, description);
-        request.input('rate', sql.Decimal(18,2), rate);
-        
-        await request.query(`
-            MERGE Products AS target
-            USING (SELECT @id AS ID) AS source
-            ON (target.ID = source.ID)
-            WHEN MATCHED THEN
-                UPDATE SET Name = @name, Description = @desc, Rate = @rate
-            WHEN NOT MATCHED THEN
-                INSERT (ID, Name, Description, Rate) VALUES (@id, @name, @desc, @rate);
-        `);
+        await pool.execute(`
+            INSERT INTO Products (ID, Name, Description, Rate) VALUES (?, ?, ?, ?)
+            ON DUPLICATE KEY UPDATE Name=VALUES(Name), Description=VALUES(Description), Rate=VALUES(Rate)
+        `, [id, name, description, rate]);
         res.status(200).json({ message: "Product saved" });
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 app.delete('/api/products/:id', async (req, res) => {
-    if (!sql.connected) return res.status(503).json({ error: "Database unavailable" });
+    if (!pool) return res.status(503).json({ error: "Database unavailable" });
     try {
-        const request = new sql.Request();
-        request.input('id', sql.NVarChar, req.params.id);
-        await request.query(`DELETE FROM Products WHERE ID = @id`);
+        await pool.execute('DELETE FROM Products WHERE ID = ?', [req.params.id]);
         res.status(200).json({ message: "Product deleted" });
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 // ... [CUSTOMER ENDPOINTS] ...
 app.get('/api/customers', async (req, res) => {
-    if (!sql.connected) return res.status(503).json({ error: "Database unavailable" });
+    if (!pool) return res.status(503).json({ error: "Database unavailable" });
     try {
-        const result = await sql.query`SELECT * FROM Customers ORDER BY Name ASC`;
-        const customers = result.recordset.map(r => ({
+        const [rows] = await pool.execute('SELECT * FROM Customers ORDER BY Name ASC');
+        const customers = rows.map(r => ({
             id: r.ID, 
             name: r.Name, 
+            contactPerson: r.ContactPerson,
             email: r.Email, 
             phone: r.Phone,
             address: r.Address,
-            gstin: r.Gstin
+            shippingAddress: r.ShippingAddress,
+            gstin: r.Gstin,
+            placeOfSupply: r.PlaceOfSupply,
+            pinCode: r.PinCode
         }));
         res.json(customers);
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 app.post('/api/customers', async (req, res) => {
-    if (!sql.connected) return res.status(503).json({ error: "Database unavailable" });
-    const { id, name, email, phone, address, gstin } = req.body;
+    if (!pool) return res.status(503).json({ error: "Database unavailable" });
+    const { id, name, contactPerson, email, phone, address, shippingAddress, gstin, placeOfSupply, pinCode } = req.body;
     try {
-        const request = new sql.Request();
-        request.input('id', sql.NVarChar, id);
-        request.input('name', sql.NVarChar, name);
-        request.input('email', sql.NVarChar, email || '');
-        request.input('phone', sql.NVarChar, phone || '');
-        request.input('addr', sql.NVarChar, address || '');
-        request.input('gstin', sql.NVarChar, gstin || '');
-        
-        await request.query(`
-            MERGE Customers AS target
-            USING (SELECT @id AS ID) AS source
-            ON (target.ID = source.ID)
-            WHEN MATCHED THEN
-                UPDATE SET Name = @name, Email = @email, Phone = @phone, Address = @addr, Gstin = @gstin
-            WHEN NOT MATCHED THEN
-                INSERT (ID, Name, Email, Phone, Address, Gstin) VALUES (@id, @name, @email, @phone, @addr, @gstin);
-        `);
+        await pool.execute(`
+            INSERT INTO Customers (ID, Name, ContactPerson, Email, Phone, Address, ShippingAddress, Gstin, PlaceOfSupply, PinCode) 
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ON DUPLICATE KEY UPDATE 
+            Name=VALUES(Name), ContactPerson=VALUES(ContactPerson), Email=VALUES(Email), Phone=VALUES(Phone), Address=VALUES(Address), ShippingAddress=VALUES(ShippingAddress),
+            Gstin=VALUES(Gstin), PlaceOfSupply=VALUES(PlaceOfSupply), PinCode=VALUES(PinCode)
+        `, [id, name, contactPerson || '', email || '', phone || '', address || '', shippingAddress || '', gstin || '', placeOfSupply || '', pinCode || '']);
         res.status(200).json({ message: "Customer saved" });
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 app.delete('/api/customers/:id', async (req, res) => {
-    if (!sql.connected) return res.status(503).json({ error: "Database unavailable" });
+    if (!pool) return res.status(503).json({ error: "Database unavailable" });
     try {
-        const request = new sql.Request();
-        request.input('id', sql.NVarChar, req.params.id);
-        await request.query(`DELETE FROM Customers WHERE ID = @id`);
+        await pool.execute('DELETE FROM Customers WHERE ID = ?', [req.params.id]);
         res.status(200).json({ message: "Customer deleted" });
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
