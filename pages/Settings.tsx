@@ -1,9 +1,11 @@
 import React, { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { SellerProfile } from '../types';
 import { SettingsService } from '../services/settingsService';
 import { ChevronLeftIcon, PhotoIcon, CheckCircleIcon } from '@heroicons/react/24/outline';
 
-const Settings: React.FC<any> = ({ history }) => {
+const Settings: React.FC = () => {
+  const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [profile, setProfile] = useState<SellerProfile>({
@@ -60,7 +62,7 @@ const Settings: React.FC<any> = ({ history }) => {
       <nav className="bg-white border-b border-gray-200 px-4 md:px-6 py-4 sticky top-0 z-10">
         <div className="max-w-4xl mx-auto flex items-center gap-4">
           <button 
-             onClick={() => history.push('/')}
+             onClick={() => navigate('/')}
              className="text-gray-500 hover:text-gray-800 flex items-center gap-1 text-sm font-medium"
           >
              <ChevronLeftIcon className="w-4 h-4" /> Dashboard

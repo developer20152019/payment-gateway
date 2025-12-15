@@ -1,45 +1,69 @@
 # PayLink - Invoice System
 
-## How to Run
+## Overview
+PayLink is a full-stack invoice generation application.
+*   **Frontend**: React (Vite)
+*   **Backend**: Node.js (Express)
+*   **Database**: MySQL
+*   **Payments**: CCAvenue & Razorpay
 
-### 1. Install Dependencies (Crucial Step)
-Before running the backend, you must install the required Node.js modules.
-Open your terminal in the project folder and run:
+## Quick Start
+
+### 1. Install Dependencies
+Run this in the project root to install libraries for both the backend and frontend.
 
 ```bash
 npm install
 ```
 
-### 2. Start the Backend
-The backend handles CCAvenue encryption/decryption and SQL database interactions.
+### 2. Database Setup (MySQL)
+This application works out-of-the-box with a local MySQL installation (like those included with MySQL Installer, XAMPP, or WAMP).
 
-```bash
-node server.js
+1.  Make sure your MySQL server is running.
+2.  (Optional) Create a `.env` file in the root folder if you need custom credentials (default is `root` with no password).
+
+**Example `.env` content:**
+```env
+DB_SERVER=localhost
+DB_USER=root
+DB_PASSWORD=your_password
+DB_NAME=PayLinkDB
+PORT=3000
 ```
-*   It will start on `http://localhost:3000`.
-*   If you see "Connected to SQL Server", your database is active.
-*   If you see "SQL Server Connection Failed", the app will run in "Payment Only" mode, and invoices will be saved to LocalStorage.
 
-### 3. Start the Frontend
-In a separate terminal window:
+### 3. Using MySQL Workbench
+You can use MySQL Workbench to view your invoices, customers, and products visually.
+
+1.  Open **MySQL Workbench**.
+2.  Click the **+** icon next to "MySQL Connections".
+3.  **Connection Name**: PayLink Local
+4.  **Hostname**: `localhost` (or your server IP)
+5.  **Port**: `3306`
+6.  **Username**: `root` (or as defined in your .env)
+7.  Click **Test Connection** and then **OK**.
+8.  Open the connection. You will see `PayLinkDB` in the "Schemas" sidebar on the left once the app runs.
+
+### 4. Run the Application
+This command starts the Backend (port 3000) and the Frontend (port 5173).
 
 ```bash
 npm run dev
 ```
-Open the app in your browser (usually `http://localhost:5173` or `http://localhost:8080`).
+
+*   The database tables will be created automatically via `db_setup.js` on the first run.
 
 ## Troubleshooting
 
-### Error: Cannot find module 'express'
-This means you skipped step 1. You must run `npm install` to download the required libraries (`express`, `cors`, etc.) defined in `package.json`.
+### "SQL Server Connection Failed"
+If you see this message in the console:
+1.  Ensure MySQL is running (check MySQL Workbench or Services).
+2.  Verify your username/password in `server.js` or `.env`.
+3.  If connection fails, the app will switch to **Storage Mode (Offline)** and save data to the browser's LocalStorage instead.
 
-### Backend Unreachable
-If the backend is not running, the frontend application will automatically switch to **Simulation Mode**.
-- Invoices will be saved to your browser's LocalStorage.
-- Payment buttons will show a "Mock Gateway" for testing purposes.
+### "Module not found"
+Run `npm install` again to ensure all packages are downloaded.
 
-## Configuration
-To change keys or switch between **AES-128** and **AES-256**:
-1.  Open `server.js`.
-2.  Edit `CODE_VERSION` (128 or 256).
-3.  Update `ccavenueConfig` with your production keys.
+## Payment Configuration
+To enable real payments, configure your keys in `.env` or `server.js`:
+*   **CCAvenue**: Update `CCAV_WORKING_KEY`, `CCAV_MERCHANT_ID`, `CCAV_ACCESS_CODE`.
+*   **Razorpay**: Update `RAZORPAY_KEY_ID`, `RAZORPAY_KEY_SECRET`.
