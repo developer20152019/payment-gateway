@@ -57,7 +57,7 @@ const getInitialInvoice = (): InvoiceData => ({
   resourceName: '',
 
   items: [
-    { id: '1', name: '', description: '', quantity: 1, rate: 0, amount: 0 },
+    { id: `item_${Date.now()}`, name: '', description: '', quantity: 1, rate: 0, amount: 0 },
   ],
   subtotal: 0,
   taxRate: 18,
@@ -296,7 +296,7 @@ const CreateInvoice: React.FC = () => {
 
   const handleAddItem = () => {
     const newItem: LineItem = {
-      id: Date.now().toString(),
+      id: `item_${Date.now()}`,
       name: '',
       description: '',
       quantity: 1,

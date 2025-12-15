@@ -226,7 +226,17 @@ app.post('/api/invoices', async (req, res) => {
         await connection.query('DELETE FROM LineItems WHERE InvoiceID = ?', [inv.id]);
         
         if (inv.items && inv.items.length > 0) {
-            const itemValues = inv.items.map(item => [item.id, inv.id, item.name, item.description, item.quantity, item.rate, item.amount]);
+            // FIX: Construct a globally unique ID for each line item using InvoiceID + ItemID + Index
+            // This prevents "Duplicate entry" errors when multiple invoices have items with simple IDs like '1'
+            const itemValues = inv.items.map((item, index) => [
+                `${inv.id}_${item.id || index}_${Date.now()}_${Math.floor(Math.random()*1000)}`, // Robust Unique ID
+                inv.id, 
+                item.name, 
+                item.description, 
+                item.quantity, 
+                item.rate, 
+                item.amount
+            ]);
             await connection.query('INSERT INTO LineItems (ID, InvoiceID, ItemName, Description, Quantity, Rate, Amount) VALUES ?', [itemValues]);
         }
 
@@ -235,7 +245,7 @@ app.post('/api/invoices', async (req, res) => {
 
     } catch (err) {
         await connection.rollback();
-        console.error(err);
+        console.error("Save Invoice Error:", err);
         res.status(500).json({ error: err.message });
     } finally {
         connection.release();
@@ -350,7 +360,6 @@ app.post('/api/payment/ccavResponseHandler', async (req, res) => {
         decrypted = ccav.decrypt(encResp, workingKey);
     } catch(e) {
         console.error("CCAvenue Decryption Failed:", e);
-        // Fail gracefully
         return res.send("<script>window.close();</script>");
     }
     
@@ -360,7 +369,8 @@ app.post('/api/payment/ccavResponseHandler', async (req, res) => {
 
     let htmlResponse = '';
 
-    if (orderStatus === 'Success') {
+    // Check status case-insensitively to be safe
+    if (orderStatus && orderStatus.toLowerCase() === 'success') {
         await pool.query('UPDATE Invoices SET Status = ?, PaymentGateway = ? WHERE ID = ?', ['PAID', 'CCAvenue', orderId]);
         htmlResponse = `<script>if(window.opener){window.opener.postMessage('PAYMENT_SUCCESS', '*');} window.close();</script>`;
     } else {
