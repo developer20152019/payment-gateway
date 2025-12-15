@@ -94,6 +94,37 @@ async function setupDatabase() {
         `);
         console.log("   ✅ Table 'Products' ensured.");
 
+        // Customers (Fix if not exists from previous steps)
+        await pool.query(`
+            IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'Customers')
+            CREATE TABLE Customers (
+                ID NVARCHAR(50) PRIMARY KEY,
+                Name NVARCHAR(100),
+                Email NVARCHAR(100),
+                Phone NVARCHAR(50),
+                Address NVARCHAR(MAX),
+                Gstin NVARCHAR(50)
+            )
+        `);
+        console.log("   ✅ Table 'Customers' ensured.");
+
+        // SellerProfile (NEW)
+        await pool.query(`
+            IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'SellerProfile')
+            CREATE TABLE SellerProfile (
+                ID NVARCHAR(50) PRIMARY KEY,
+                SellerName NVARCHAR(100),
+                BusinessName NVARCHAR(100),
+                SellerAddress NVARCHAR(MAX),
+                SellerGstin NVARCHAR(50),
+                SellerEmail NVARCHAR(100),
+                SellerPhone NVARCHAR(50),
+                LogoUrl NVARCHAR(MAX),
+                BrandColor NVARCHAR(20) DEFAULT '#4f46e5'
+            )
+        `);
+        console.log("   ✅ Table 'SellerProfile' ensured.");
+
         console.log("\n🎉 Setup Complete! You can now run 'node server.js'.");
 
     } catch (err) {

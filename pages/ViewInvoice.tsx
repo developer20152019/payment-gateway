@@ -441,7 +441,7 @@ const ViewInvoice: React.FC = () => {
           </div>
           <div className="flex gap-2 items-center">
              
-             {/* WhatsApp Button removed as per request */}
+             {/* Button removed */}
 
              <button 
               onClick={handleDownloadPdf} 

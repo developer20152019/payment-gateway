@@ -17,6 +17,26 @@ export interface Product {
   rate: number;
 }
 
+export interface Customer {
+  id: string;
+  name: string;
+  email: string;
+  phone: string;
+  address: string;
+  gstin?: string;
+}
+
+export interface SellerProfile {
+  sellerName: string;
+  businessName: string;
+  sellerAddress: string;
+  sellerGstin: string;
+  sellerEmail: string;
+  sellerPhone: string;
+  logoUrl: string;
+  brandColor: string;
+}
+
 export interface LineItem {
   id: string;
   name: string; 

@@ -4,6 +4,8 @@ import CreateInvoice from './pages/CreateInvoice';
 import ViewInvoice from './pages/ViewInvoice';
 import Dashboard from './pages/Dashboard';
 import Products from './pages/Products';
+import Customers from './pages/Customers';
+import Settings from './pages/Settings';
 
 const App: React.FC = () => {
   return (
@@ -29,6 +31,14 @@ const App: React.FC = () => {
           <Route
             path="/products"
             element={<Products />}
+          />
+          <Route
+            path="/customers"
+            element={<Customers />}
+          />
+          <Route
+            path="/settings"
+            element={<Settings />}
           />
           <Route path="*" element={<Navigate to="/" />} />
         </Routes>

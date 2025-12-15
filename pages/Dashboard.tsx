@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { InvoiceData, PaymentStatus, DocumentType } from '../types';
 import { InvoiceService } from '../services/invoiceService';
-import { PlusIcon, DocumentTextIcon, TrashIcon, MagnifyingGlassIcon, LinkIcon, CheckIcon, XMarkIcon, FunnelIcon, ArrowUpIcon, ArrowDownIcon, BanknotesIcon, PencilIcon, TagIcon, ClipboardDocumentListIcon } from '@heroicons/react/24/outline';
+import { PlusIcon, DocumentTextIcon, TrashIcon, MagnifyingGlassIcon, LinkIcon, CheckIcon, XMarkIcon, FunnelIcon, ArrowUpIcon, ArrowDownIcon, BanknotesIcon, PencilIcon, TagIcon, ClipboardDocumentListIcon, UsersIcon, Cog6ToothIcon } from '@heroicons/react/24/outline';
 
 const Dashboard: React.FC = () => {
   const navigate = useNavigate();
@@ -234,18 +234,31 @@ const Dashboard: React.FC = () => {
           <div className="font-bold text-xl text-indigo-600 flex items-center gap-2">
             <DocumentTextIcon className="w-6 h-6" /> PayLink
           </div>
-          <div className="flex gap-3">
+          <div className="flex gap-2 sm:gap-3">
+            <button
+                onClick={() => navigate('/settings')}
+                className="text-gray-500 hover:text-gray-800 p-2 rounded-lg hover:bg-gray-50 transition-colors"
+                title="Settings"
+            >
+                <Cog6ToothIcon className="w-6 h-6" />
+            </button>
+            <button
+                onClick={() => navigate('/customers')}
+                className="bg-white text-gray-700 border border-gray-300 px-3 py-2 rounded-lg font-medium text-sm flex items-center gap-2 hover:bg-gray-50 transition-colors"
+            >
+                <UsersIcon className="w-4 h-4" /> <span className="hidden sm:inline">Customers</span>
+            </button>
             <button
                 onClick={() => navigate('/products')}
-                className="bg-white text-gray-700 border border-gray-300 px-4 py-2 rounded-lg font-medium text-sm flex items-center gap-2 hover:bg-gray-50 transition-colors"
+                className="bg-white text-gray-700 border border-gray-300 px-3 py-2 rounded-lg font-medium text-sm flex items-center gap-2 hover:bg-gray-50 transition-colors"
             >
-                <TagIcon className="w-4 h-4" /> Manage Products
+                <TagIcon className="w-4 h-4" /> <span className="hidden sm:inline">Products</span>
             </button>
             <button
                 onClick={() => navigate('/create')}
                 className="bg-indigo-600 text-white px-4 py-2 rounded-lg font-medium text-sm flex items-center gap-2 hover:bg-indigo-700 transition-colors"
             >
-                <PlusIcon className="w-4 h-4" /> New Document
+                <PlusIcon className="w-4 h-4" /> <span className="hidden sm:inline">New Document</span>
             </button>
           </div>
         </div>
@@ -329,8 +342,8 @@ const Dashboard: React.FC = () => {
                             onChange={(e) => setStatusFilter(e.target.value)}
                         >
                             <option value="ALL">All Status</option>
-                            <option value={PaymentStatus.PAID}>Paid</option>
                             <option value={PaymentStatus.PENDING}>Pending</option>
+                            <option value={PaymentStatus.PAID}>Paid</option>
                             <option value={PaymentStatus.OVERDUE}>Overdue</option>
                             <option value={PaymentStatus.FAILED}>Failed</option>
                         </select>
@@ -338,221 +351,98 @@ const Dashboard: React.FC = () => {
                             <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path></svg>
                         </div>
                     </div>
-
-                    {/* 4. Date Range */}
-                    <div className="md:col-span-4 flex gap-2 items-center">
-                        <input
-                            type="date"
-                            className="block w-full border border-gray-300 rounded-lg text-sm p-2 text-gray-600 focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 transition-all"
-                            value={dateRange.start}
-                            onChange={(e) => setDateRange({ ...dateRange, start: e.target.value })}
-                            title="Start Date"
-                        />
-                        <span className="text-gray-400 text-sm">to</span>
-                        <input
-                            type="date"
-                            className="block w-full border border-gray-300 rounded-lg text-sm p-2 text-gray-600 focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 transition-all"
-                            value={dateRange.end}
-                            onChange={(e) => setDateRange({ ...dateRange, end: e.target.value })}
-                            title="End Date"
-                        />
-                    </div>
-                 </div>
-
-                 {/* Resource Filters Row */}
-                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-2 border-t border-gray-200 border-dashed">
-                    <div className="relative">
-                        <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                            <ClipboardDocumentListIcon className="h-4 w-4 text-gray-400" />
-                        </div>
-                        <input
-                            type="text"
-                            placeholder="Filter by Resource Section"
-                            className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg text-sm bg-white placeholder-gray-400 focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 transition-all"
-                            value={resourceSectionFilter}
-                            onChange={(e) => setResourceSectionFilter(e.target.value)}
-                        />
-                    </div>
-                    <div className="relative">
-                        <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                            <TagIcon className="h-4 w-4 text-gray-400" />
-                        </div>
-                        <input
-                            type="text"
-                            placeholder="Filter by Resource Name"
-                            className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg text-sm bg-white placeholder-gray-400 focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 transition-all"
-                            value={resourceNameFilter}
-                            onChange={(e) => setResourceNameFilter(e.target.value)}
-                        />
-                    </div>
                  </div>
              </div>
           </div>
 
-          {isLoading ? (
-            <div className="p-12 text-center">
-               <div className="w-8 h-8 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-               <p className="text-gray-500">Loading your documents...</p>
-            </div>
-          ) : sortedInvoices.length === 0 ? (
-            <div className="p-12 text-center flex flex-col items-center">
-               <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mb-4">
-                  <DocumentTextIcon className="w-8 h-8 text-gray-400" />
-               </div>
-               <h3 className="text-lg font-medium text-gray-900 mb-2">{hasActiveFilters ? 'No matching documents' : 'No documents yet'}</h3>
-               <p className="text-gray-500 mb-6 max-w-sm">
-                 {hasActiveFilters ? 'Try adjusting your filters or search terms.' : 'Create your first invoice to start tracking payments and managing your business.'}
-               </p>
-               {!hasActiveFilters && (
-                 <button
-                    onClick={() => navigate('/create')}
-                    className="bg-indigo-600 text-white px-6 py-3 rounded-lg font-medium hover:bg-indigo-700 transition-colors"
-                  >
-                    Create Document
-                  </button>
-               )}
-               {hasActiveFilters && (
-                 <button
-                    onClick={clearFilters}
-                    className="text-indigo-600 font-medium hover:text-indigo-800"
-                  >
-                    Clear all filters
-                  </button>
-               )}
-            </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-sm text-gray-600">
-                <thead className="bg-gray-50 text-xs uppercase font-medium text-gray-500 border-b border-gray-100 select-none">
-                  <tr>
-                    <th className="px-6 py-3">Reference</th>
-                    <th className="px-6 py-3">Client</th>
-                    <th 
-                        className="px-6 py-3 cursor-pointer hover:bg-gray-100 transition-colors group"
-                        onClick={() => handleSort('date')}
-                    >
-                        <div className="flex items-center gap-1">
-                            Date
-                            {sortConfig.key === 'date' && (
-                                sortConfig.direction === 'asc' 
-                                ? <ArrowUpIcon className="w-3 h-3 text-indigo-600" /> 
-                                : <ArrowDownIcon className="w-3 h-3 text-indigo-600" />
-                            )}
-                            {sortConfig.key !== 'date' && <ArrowDownIcon className="w-3 h-3 text-gray-300 opacity-0 group-hover:opacity-100" />}
-                        </div>
-                    </th>
-                    <th 
-                        className="px-6 py-3 text-right cursor-pointer hover:bg-gray-100 transition-colors group"
-                        onClick={() => handleSort('amount')}
-                    >
-                        <div className="flex items-center justify-end gap-1">
-                            Amount
-                            {sortConfig.key === 'amount' && (
-                                sortConfig.direction === 'asc' 
-                                ? <ArrowUpIcon className="w-3 h-3 text-indigo-600" /> 
-                                : <ArrowDownIcon className="w-3 h-3 text-indigo-600" />
-                            )}
-                            {sortConfig.key !== 'amount' && <ArrowDownIcon className="w-3 h-3 text-gray-300 opacity-0 group-hover:opacity-100" />}
-                        </div>
-                    </th>
-                    <th className="px-6 py-3 text-center">Status</th>
-                    <th className="px-6 py-3 text-right">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-100">
-                  {sortedInvoices.map((invoice) => (
-                    <tr 
-                      key={invoice.id} 
-                      className="hover:bg-gray-50 cursor-pointer transition-colors"
-                      onClick={() => navigate(`/view/${invoice.id}`)}
-                    >
-                      <td className="px-6 py-4">
-                        <div className="flex items-center gap-2 mb-1">
-                            <span className="font-medium text-gray-900">{invoice.invoiceNumber}</span>
-                            {getTypeBadge(invoice.type)}
-                        </div>
-                        {(invoice.resourceSection || invoice.resourceName) && (
-                            <div className="text-[10px] text-gray-400 flex flex-wrap gap-1">
-                                {invoice.resourceSection && <span className="bg-gray-100 px-1 rounded">{invoice.resourceSection}</span>}
-                                {invoice.resourceName && <span className="bg-gray-100 px-1 rounded">{invoice.resourceName}</span>}
-                            </div>
-                        )}
-                        {invoice.paymentGateway === 'CASH' && invoice.status === PaymentStatus.PAID && (
-                            <div className="mt-1">
-                                <span className="text-[10px] font-bold text-green-700 bg-green-100 px-1.5 py-0.5 rounded border border-green-200">
-                                    PAID CASH
-                                </span>
-                            </div>
-                        )}
-                      </td>
-                      <td className="px-6 py-4">
-                        <div className="font-medium text-gray-900">{invoice.buyerName}</div>
-                        <div className="text-xs text-gray-400">{invoice.buyerEmail}</div>
-                      </td>
-                      <td className="px-6 py-4 text-gray-500">{invoice.date}</td>
-                      <td className="px-6 py-4 text-right font-medium text-gray-900">
-                        {new Intl.NumberFormat('en-IN', { style: 'currency', currency: invoice.currency }).format(invoice.total)}
-                      </td>
-                      <td className="px-6 py-4 text-center">
-                        {getStatusBadge(invoice.status)}
-                      </td>
-                      <td className="px-6 py-4 text-right">
-                        <div className="flex justify-end gap-2 items-center">
-                          {/* Manual Paid & Edit Buttons (Only for Non-Paid) */}
-                          {invoice.status !== PaymentStatus.PAID && (
-                              <>
-                                <button 
-                                  onClick={(e) => handleMarkAsPaid(e, invoice.id, invoice.invoiceNumber)}
-                                  className="p-1.5 text-gray-400 hover:text-green-600 hover:bg-green-50 rounded transition-colors"
-                                  title="Mark as Paid via Cash"
-                                >
-                                  <BanknotesIcon className="w-5 h-5" />
-                                </button>
-                                <button 
-                                  onClick={(e) => handleEdit(e, invoice.id)}
-                                  className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors"
-                                  title="Edit"
-                                >
-                                  <PencilIcon className="w-5 h-5" />
-                                </button>
-                              </>
-                          )}
+          <div className="overflow-x-auto">
+                <table className="w-full text-left border-collapse">
+                   <thead className="bg-gray-50 text-xs uppercase font-medium text-gray-500 border-b border-gray-100">
+                      <tr>
+                         <th className="px-6 py-4">Document</th>
+                         <th className="px-6 py-4">Client</th>
+                         <th className="px-6 py-4 cursor-pointer hover:text-gray-700" onClick={() => handleSort('date')}>
+                            <div className="flex items-center gap-1">Date {sortConfig.key === 'date' && (sortConfig.direction === 'asc' ? <ArrowUpIcon className="w-3 h-3"/> : <ArrowDownIcon className="w-3 h-3"/>)}</div>
+                         </th>
+                         <th className="px-6 py-4 cursor-pointer hover:text-gray-700 text-right" onClick={() => handleSort('amount')}>
+                            <div className="flex items-center justify-end gap-1">Amount {sortConfig.key === 'amount' && (sortConfig.direction === 'asc' ? <ArrowUpIcon className="w-3 h-3"/> : <ArrowDownIcon className="w-3 h-3"/>)}</div>
+                         </th>
+                         <th className="px-6 py-4 text-center">Status</th>
+                         <th className="px-6 py-4 text-right">Actions</th>
+                      </tr>
+                   </thead>
+                   <tbody className="divide-y divide-gray-100 text-sm">
+                      {isLoading ? (
+                          <tr>
+                              <td colSpan={6} className="px-6 py-8 text-center text-gray-500">Loading...</td>
+                          </tr>
+                      ) : sortedInvoices.length === 0 ? (
+                          <tr>
+                              <td colSpan={6} className="px-6 py-8 text-center text-gray-500">
+                                  No documents found matching your filters.
+                              </td>
+                          </tr>
+                      ) : sortedInvoices.map((inv) => (
+                          <tr key={inv.id} className="hover:bg-gray-50 transition-colors group cursor-pointer" onClick={() => navigate(`/view/${inv.id}`)}>
+                              <td className="px-6 py-4">
+                                  <div className="font-bold text-gray-900">{inv.invoiceNumber}</div>
+                                  <div className="mt-1">{getTypeBadge(inv.type)}</div>
+                              </td>
+                              <td className="px-6 py-4">
+                                  <div className="font-medium text-gray-900">{inv.buyerName}</div>
+                                  <div className="text-xs text-gray-500">{inv.buyerEmail}</div>
+                              </td>
+                              <td className="px-6 py-4 text-gray-600 whitespace-nowrap">
+                                  {inv.date}
+                              </td>
+                              <td className="px-6 py-4 text-right font-medium text-gray-900 whitespace-nowrap">
+                                  {new Intl.NumberFormat('en-IN', { style: 'currency', currency: inv.currency }).format(inv.total)}
+                              </td>
+                              <td className="px-6 py-4 text-center">
+                                  {inv.type === 'INVOICE' && getStatusBadge(inv.status)}
+                              </td>
+                              <td className="px-6 py-4 text-right">
+                                  <div className="flex justify-end gap-2" onClick={(e) => e.stopPropagation()}>
+                                      <button 
+                                          onClick={(e) => handleCopyLink(e, inv.id)}
+                                          className="p-1.5 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded transition-colors relative"
+                                          title="Copy Link"
+                                      >
+                                          {copiedId === inv.id ? <CheckIcon className="w-5 h-5 text-green-600" /> : <LinkIcon className="w-5 h-5" />}
+                                      </button>
+                                      
+                                      <button 
+                                          onClick={(e) => handleEdit(e, inv.id)}
+                                          className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors"
+                                          title="Edit"
+                                      >
+                                          <PencilIcon className="w-5 h-5" />
+                                      </button>
 
-                          {/* Copy Link Button */}
-                          <button 
-                             onClick={(e) => handleCopyLink(e, invoice.id)}
-                             className={`p-1.5 rounded transition-all duration-200 flex items-center gap-1 ${
-                               copiedId === invoice.id 
-                               ? 'bg-green-100 text-green-700 w-24 justify-center shadow-sm border border-green-200' 
-                               : 'text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 w-8 justify-center'
-                             }`}
-                             title="Copy Link"
-                          >
-                            {copiedId === invoice.id ? (
-                              <>
-                                <CheckIcon className="w-4 h-4" />
-                                <span className="text-xs font-bold">Copied</span>
-                              </>
-                            ) : (
-                              <LinkIcon className="w-5 h-5" />
-                            )}
-                          </button>
-                          
-                          <button 
-                            onClick={(e) => handleDelete(e, invoice.id)}
-                            className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
-                            title="Delete"
-                          >
-                            <TrashIcon className="w-5 h-5" />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
+                                      {inv.type === 'INVOICE' && inv.status !== PaymentStatus.PAID && (
+                                          <button 
+                                              onClick={(e) => handleMarkAsPaid(e, inv.id, inv.invoiceNumber)}
+                                              className="p-1.5 text-gray-400 hover:text-green-600 hover:bg-green-50 rounded transition-colors"
+                                              title="Mark as Paid (Cash)"
+                                          >
+                                              <BanknotesIcon className="w-5 h-5" />
+                                          </button>
+                                      )}
+
+                                      <button 
+                                          onClick={(e) => handleDelete(e, inv.id)}
+                                          className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
+                                          title="Delete"
+                                      >
+                                          <TrashIcon className="w-5 h-5" />
+                                      </button>
+                                  </div>
+                              </td>
+                          </tr>
+                      ))}
+                   </tbody>
+                </table>
+             </div>
         </div>
       </div>
     </div>

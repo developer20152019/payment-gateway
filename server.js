@@ -53,7 +53,13 @@ try {
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-app.use(cors());
+// Enable All CORS Requests for development convenience
+app.use(cors({
+    origin: '*',
+    methods: ['GET', 'POST', 'DELETE', 'PUT', 'PATCH', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
+}));
+
 // Increased limit to 50mb to handle large PDF attachments via Email
 app.use(bodyParser.json({ limit: '50mb' })); 
 app.use(bodyParser.urlencoded({ extended: true, limit: '50mb' }));
@@ -337,6 +343,57 @@ const mapToInvoice = (record, items = []) => ({
     items: items
 });
 
+// --- SETTINGS ENDPOINTS ---
+app.get('/api/settings/seller', async (req, res) => {
+    if (!sql.connected) return res.status(503).json({ error: "Database unavailable" });
+    try {
+        const result = await sql.query`SELECT * FROM SellerProfile WHERE ID = 'default'`;
+        if (result.recordset.length === 0) return res.json({}); // Return empty object if not set
+        const r = result.recordset[0];
+        res.json({
+            sellerName: r.SellerName,
+            businessName: r.BusinessName,
+            sellerAddress: r.SellerAddress,
+            sellerGstin: r.SellerGstin,
+            sellerEmail: r.SellerEmail,
+            sellerPhone: r.SellerPhone,
+            logoUrl: r.LogoUrl,
+            brandColor: r.BrandColor
+        });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.post('/api/settings/seller', async (req, res) => {
+    if (!sql.connected) return res.status(503).json({ error: "Database unavailable" });
+    const s = req.body;
+    try {
+        const request = new sql.Request();
+        request.input('id', sql.NVarChar, 'default');
+        request.input('sName', sql.NVarChar, s.sellerName || '');
+        request.input('bName', sql.NVarChar, s.businessName || '');
+        request.input('sAddr', sql.NVarChar, s.sellerAddress || '');
+        request.input('sGstin', sql.NVarChar, s.sellerGstin || '');
+        request.input('sEmail', sql.NVarChar, s.sellerEmail || '');
+        request.input('sPhone', sql.NVarChar, s.sellerPhone || '');
+        request.input('logo', sql.NVarChar, s.logoUrl || '');
+        request.input('color', sql.NVarChar, s.brandColor || '#4f46e5');
+
+        await request.query(`
+            MERGE SellerProfile AS target
+            USING (SELECT @id AS ID) AS source
+            ON (target.ID = source.ID)
+            WHEN MATCHED THEN
+                UPDATE SET SellerName=@sName, BusinessName=@bName, SellerAddress=@sAddr, 
+                           SellerGstin=@sGstin, SellerEmail=@sEmail, SellerPhone=@sPhone, 
+                           LogoUrl=@logo, BrandColor=@color
+            WHEN NOT MATCHED THEN
+                INSERT (ID, SellerName, BusinessName, SellerAddress, SellerGstin, SellerEmail, SellerPhone, LogoUrl, BrandColor)
+                VALUES (@id, @sName, @bName, @sAddr, @sGstin, @sEmail, @sPhone, @logo, @color);
+        `);
+        res.status(200).json({ message: "Settings saved" });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 // --- INVOICE ENDPOINTS ---
 
 app.get('/api/invoices', async (req, res) => {
@@ -517,6 +574,58 @@ app.delete('/api/products/:id', async (req, res) => {
         request.input('id', sql.NVarChar, req.params.id);
         await request.query(`DELETE FROM Products WHERE ID = @id`);
         res.status(200).json({ message: "Product deleted" });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// ... [CUSTOMER ENDPOINTS] ...
+app.get('/api/customers', async (req, res) => {
+    if (!sql.connected) return res.status(503).json({ error: "Database unavailable" });
+    try {
+        const result = await sql.query`SELECT * FROM Customers ORDER BY Name ASC`;
+        const customers = result.recordset.map(r => ({
+            id: r.ID, 
+            name: r.Name, 
+            email: r.Email, 
+            phone: r.Phone,
+            address: r.Address,
+            gstin: r.Gstin
+        }));
+        res.json(customers);
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.post('/api/customers', async (req, res) => {
+    if (!sql.connected) return res.status(503).json({ error: "Database unavailable" });
+    const { id, name, email, phone, address, gstin } = req.body;
+    try {
+        const request = new sql.Request();
+        request.input('id', sql.NVarChar, id);
+        request.input('name', sql.NVarChar, name);
+        request.input('email', sql.NVarChar, email || '');
+        request.input('phone', sql.NVarChar, phone || '');
+        request.input('addr', sql.NVarChar, address || '');
+        request.input('gstin', sql.NVarChar, gstin || '');
+        
+        await request.query(`
+            MERGE Customers AS target
+            USING (SELECT @id AS ID) AS source
+            ON (target.ID = source.ID)
+            WHEN MATCHED THEN
+                UPDATE SET Name = @name, Email = @email, Phone = @phone, Address = @addr, Gstin = @gstin
+            WHEN NOT MATCHED THEN
+                INSERT (ID, Name, Email, Phone, Address, Gstin) VALUES (@id, @name, @email, @phone, @addr, @gstin);
+        `);
+        res.status(200).json({ message: "Customer saved" });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.delete('/api/customers/:id', async (req, res) => {
+    if (!sql.connected) return res.status(503).json({ error: "Database unavailable" });
+    try {
+        const request = new sql.Request();
+        request.input('id', sql.NVarChar, req.params.id);
+        await request.query(`DELETE FROM Customers WHERE ID = @id`);
+        res.status(200).json({ message: "Customer deleted" });
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
