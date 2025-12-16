@@ -13,6 +13,12 @@ const formatCurrency = (amount: number, currency: string) => {
   }).format(amount);
 };
 
+// Helper to format ISO strings to date only (YYYY-MM-DD)
+const formatDateOnly = (isoString: string) => {
+    if (!isoString) return '';
+    return isoString.split('T')[0];
+};
+
 const StatusBadge: React.FC<{ status: PaymentStatus }> = ({ status }) => {
   const styles = {
     [PaymentStatus.PAID]: 'bg-green-100 text-green-800 border-green-200',
@@ -116,12 +122,12 @@ export const InvoicePreview: React.FC<Props> = ({ invoice }) => {
              )}
 
              <span className="font-bold text-gray-800">Date</span>
-             <span className="text-gray-600 font-medium">{invoice.date}</span>
+             <span className="text-gray-600 font-medium">{formatDateOnly(invoice.date)}</span>
              
              {invoice.type === 'INVOICE' && (
                <>
                  <span className="font-bold text-gray-800">Due Date</span>
-                 <span className="text-gray-600 font-medium">{invoice.dueDate}</span>
+                 <span className="text-gray-600 font-medium">{formatDateOnly(invoice.dueDate)}</span>
                </>
              )}
           </div>

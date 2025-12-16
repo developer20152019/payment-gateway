@@ -31,8 +31,8 @@ async function setupDatabase() {
                 InvoiceNumber VARCHAR(50),
                 PaidInvoiceNumber VARCHAR(50), 
                 Type VARCHAR(20) DEFAULT 'INVOICE',
-                Date DATE,
-                DueDate DATE,
+                Date DATETIME,
+                DueDate DATETIME,
                 Template VARCHAR(50),
                 BrandColor VARCHAR(20),
                 LogoUrl LONGTEXT,
@@ -63,12 +63,16 @@ async function setupDatabase() {
             )
         `);
         
-        // Attempt to add columns if they exist (Migration for dev)
+        // Attempt to add/modify columns if they exist (Migration for dev)
         try { await connection.query("ALTER TABLE Invoices ADD COLUMN BuyerContactPerson VARCHAR(100)"); } catch(e) {}
         try { await connection.query("ALTER TABLE Invoices ADD COLUMN BuyerShippingAddress TEXT"); } catch(e) {}
         try { await connection.query("ALTER TABLE Invoices ADD COLUMN PlaceOfSupply VARCHAR(100)"); } catch(e) {}
         try { await connection.query("ALTER TABLE Invoices ADD COLUMN BuyerPinCode VARCHAR(20)"); } catch(e) {}
         try { await connection.query("ALTER TABLE Invoices ADD COLUMN PaidInvoiceNumber VARCHAR(50)"); } catch(e) {}
+        
+        // Migrate Date columns to DATETIME
+        try { await connection.query("ALTER TABLE Invoices MODIFY COLUMN Date DATETIME"); } catch(e) {}
+        try { await connection.query("ALTER TABLE Invoices MODIFY COLUMN DueDate DATETIME"); } catch(e) {}
 
         console.log("   ✅ Table 'Invoices' ensured.");
 

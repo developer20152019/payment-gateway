@@ -10,13 +10,22 @@ const LOCAL_STORAGE_KEY = 'paylink_invoices';
 const mapInvoiceFromBackend = (data: any): InvoiceData => {
   const items = Array.isArray(data.items) ? data.items : (Array.isArray(data.Items) ? data.Items : []);
   
+  // Helper to ensure we get a valid ISO string or fallback to now
+  const toISO = (dateVal: any) => {
+      try {
+          return new Date(dateVal).toISOString();
+      } catch (e) {
+          return new Date().toISOString();
+      }
+  };
+
   return {
     id: data.id || data.ID,
     invoiceNumber: data.invoiceNumber || data.InvoiceNumber,
     paidInvoiceNumber: data.paidInvoiceNumber || data.PaidInvoiceNumber,
     type: data.type || data.Type || 'INVOICE',
-    date: data.date || data.Date,
-    dueDate: data.dueDate || data.DueDate,
+    date: toISO(data.date || data.Date),
+    dueDate: toISO(data.dueDate || data.DueDate),
     template: data.template || data.Template || 'modern',
     brandColor: data.brandColor || data.BrandColor || '#4f46e5',
     logoUrl: data.logoUrl || data.LogoUrl,

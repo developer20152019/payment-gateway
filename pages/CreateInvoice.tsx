@@ -44,8 +44,9 @@ const getInitialInvoice = (): InvoiceData => ({
   id: `inv_${Date.now()}`,
   invoiceNumber: generateInvoiceNumber(),
   type: 'INVOICE',
-  date: new Date().toISOString().split('T')[0],
-  dueDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+  // Store full ISO string to capture exact creation time
+  date: new Date().toISOString(),
+  dueDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
   
   // Branding Defaults
   template: 'modern',
@@ -172,6 +173,18 @@ const CreateInvoice: React.FC = () => {
 
   const handleChange = (section: keyof InvoiceData, value: any) => {
      setInvoice({ ...invoice, [section]: value });
+  };
+
+  const handleDateChange = (section: keyof InvoiceData, newValue: string) => {
+      // Input date is YYYY-MM-DD. We want to preserve the time from the existing ISO string.
+      const currentIso = invoice[section] as string;
+      // Default to current time if no time found or new string
+      const currentTimePart = (currentIso && currentIso.includes('T')) 
+          ? currentIso.split('T')[1] 
+          : new Date().toISOString().split('T')[1];
+      
+      const newIso = `${newValue}T${currentTimePart}`;
+      setInvoice({ ...invoice, [section]: newIso });
   };
 
   const handlePhoneChange = (section: keyof InvoiceData, value: string) => {
@@ -422,6 +435,10 @@ const CreateInvoice: React.FC = () => {
       );
   }
 
+  // Safe split for input display
+  const dateValue = invoice.date ? invoice.date.split('T')[0] : '';
+  const dueDateValue = invoice.dueDate ? invoice.dueDate.split('T')[0] : '';
+
   return (
     <div className="min-h-screen bg-gray-50 pb-12">
       <nav className="bg-white border-b border-gray-200 px-4 md:px-6 py-4 sticky top-0 z-20">
@@ -490,8 +507,8 @@ const CreateInvoice: React.FC = () => {
                                         type="date" 
                                         required
                                         className="w-full border border-gray-300 rounded-lg pl-3 pr-10 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none transition-shadow"
-                                        value={invoice.date}
-                                        onChange={(e) => handleChange('date', e.target.value)}
+                                        value={dateValue}
+                                        onChange={(e) => handleDateChange('date', e.target.value)}
                                     />
                                     <CalendarDaysIcon className="w-5 h-5 absolute right-3 top-2 text-gray-400 pointer-events-none" />
                                 </div>
@@ -503,10 +520,10 @@ const CreateInvoice: React.FC = () => {
                                 <div className="relative">
                                     <input 
                                         type="date" 
-                                        min={invoice.date}
+                                        min={dateValue}
                                         className="w-full border border-gray-300 rounded-lg pl-3 pr-10 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none transition-shadow"
-                                        value={invoice.dueDate}
-                                        onChange={(e) => handleChange('dueDate', e.target.value)}
+                                        value={dueDateValue}
+                                        onChange={(e) => handleDateChange('dueDate', e.target.value)}
                                     />
                                     <CalendarDaysIcon className="w-5 h-5 absolute right-3 top-2 text-gray-400 pointer-events-none" />
                                 </div>
