@@ -81,6 +81,7 @@ const ViewInvoice: React.FC = () => {
     const element = document.getElementById('invoice-content');
     if (!element || typeof (window as any).html2pdf === 'undefined') {
         console.error("PDF generation failed: Library missing or element not found");
+        showNotification("PDF Library missing. Please refresh.", 'error');
         setIsSendingEmail(false);
         return;
     }
@@ -96,26 +97,46 @@ const ViewInvoice: React.FC = () => {
     try {
         const pdfBase64 = await (window as any).html2pdf().from(element).set(opt).outputPdf('datauristring');
         
-        // 1. Send Email (Backend sends email with attachment)
-        await InvoiceService.sendPdfByEmail(currentInvoice, pdfBase64);
-        
-        // 2. Send WhatsApp Automatically (Backend sends template message via YCloud)
-        showNotification("Email sent. Sending WhatsApp...", 'info');
+        let emailSuccess = false;
+
+        // 1. Attempt Email
         try {
-            // Pass triggerType so backend selects the correct template (inv_quote_status vs payment_rcv_inv)
-            await InvoiceService.sendWhatsAppNotification(currentInvoice, triggerType);
-            showNotification("Email and WhatsApp sent successfully!", 'success');
-        } catch (waError) {
-            console.error("WhatsApp Send Failed:", waError);
-            showNotification("Email sent, but WhatsApp failed.", 'warning');
+            await InvoiceService.sendPdfByEmail(currentInvoice, pdfBase64);
+            emailSuccess = true;
+        } catch (emailError: any) {
+            console.error("Email Failed:", emailError);
+            showNotification("Email failed. Trying WhatsApp fallback...", 'warning');
         }
         
-        // Show share modal after email/whatsapp attempt
+        // 2. Attempt WhatsApp (Runs if Email succeeds OR fails)
+        try {
+            if (emailSuccess) {
+                 showNotification("Email sent. Sending WhatsApp...", 'info');
+            }
+            
+            // Pass triggerType so backend selects the correct template (inv_quote_status vs payment_rcv_inv)
+            await InvoiceService.sendWhatsAppNotification(currentInvoice, triggerType);
+            
+            if (emailSuccess) {
+                showNotification("Email and WhatsApp sent successfully!", 'success');
+            } else {
+                showNotification("Email failed, but WhatsApp sent!", 'success');
+            }
+        } catch (waError) {
+            console.error("WhatsApp Send Failed:", waError);
+            if (emailSuccess) {
+                showNotification("Email sent, but WhatsApp failed.", 'warning');
+            } else {
+                showNotification("Failed to send notifications (Email & WhatsApp).", 'error');
+            }
+        }
+        
+        // Show share modal after attempts
         setShowShareModal(true);
 
     } catch (error: any) {
-        console.error("Notification Error:", error);
-        showNotification("Failed to send notifications.", 'error');
+        console.error("PDF Generation Error:", error);
+        showNotification("Failed to generate PDF for sending.", 'error');
         setShowShareModal(true);
     } finally {
         setIsSendingEmail(false);

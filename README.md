@@ -52,6 +52,23 @@ npm run dev
 
 *   The database tables will be created automatically via `db_setup.js` on the first run.
 
+## Email Configuration (Gmail)
+To send real emails using your Gmail account, you must configure `.env` as follows:
+
+```env
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=587
+SMTP_USER=your_gmail@gmail.com
+SMTP_PASS=your_16_char_app_password
+```
+
+**⚠️ Important: You cannot use your standard login password.**
+1.  Go to **[Google Account Security](https://myaccount.google.com/security)**.
+2.  Enable **2-Step Verification**.
+3.  Search for **"App Passwords"**.
+4.  Create a new App Password (name it "PayLink").
+5.  Use that 16-character code as your `SMTP_PASS`.
+
 ## Troubleshooting
 
 ### "SQL Server Connection Failed"

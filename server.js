@@ -362,6 +362,17 @@ app.post('/api/notify', async (req, res) => {
 
     } catch (error) {
         console.error('❌ Email Failed:', error);
+        
+        // --- ADDED: Specific Hint for Gmail Authentication Errors ---
+        if (error.code === 'EAUTH' && (process.env.SMTP_HOST || '').includes('gmail')) {
+            console.log('\n💡 GMAIL HINT: You cannot use your regular login password.');
+            console.log('   You must use a Google "App Password".');
+            console.log('   1. Go to https://myaccount.google.com/security');
+            console.log('   2. Enable 2-Step Verification.');
+            console.log('   3. Search for "App Passwords".');
+            console.log('   4. Create one for "Mail" and use that 16-character code as SMTP_PASS in your .env file.\n');
+        }
+        
         res.status(500).json({ error: "Failed to send email: " + error.message });
     }
 });
