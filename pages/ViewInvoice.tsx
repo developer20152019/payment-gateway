@@ -78,8 +78,8 @@ const ViewInvoice: React.FC = () => {
     }
 
     const url = window.location.href;
-    const typeLabel = invoice.type === 'QUOTATION' ? 'Quotation' : 'Invoice';
-    const text = `Hello ${invoice.buyerName},%0A%0AHere is your ${typeLabel} *${invoice.invoiceNumber}* from ${invoice.businessName}.%0A%0AYou can view and pay it here:%0A${url}%0A%0AThank you!`;
+    // Updated text format requested by user
+    const text = `Dear ${invoice.buyerName},%0A%0AThank you for contacting us. Your estimate can be paid, viewed, printed and downloaded as PDF from the link below.%0A%0A${url}`;
 
     window.open(`https://wa.me/${phone}?text=${text}`, '_blank');
   };
@@ -111,7 +111,7 @@ const ViewInvoice: React.FC = () => {
         const pdfBase64 = await (window as any).html2pdf().from(element).set(opt).outputPdf('datauristring');
         await InvoiceService.sendPdfByEmail(currentInvoice, pdfBase64);
         
-        // If this was triggered by Creation or Payment, show the Share Modal instead of just a toast
+        // Show share modal after email attempt (success or fail) if not already shown
         setShowShareModal(true);
         // We still show a small success toast in background
         showNotification("Email sent successfully!", 'success');
@@ -119,7 +119,6 @@ const ViewInvoice: React.FC = () => {
     } catch (error: any) {
         console.error("Email Error:", error);
         showNotification("Failed to send email.", 'error');
-        // Still show share modal so they can WhatsApp even if Email failed
         setShowShareModal(true);
     } finally {
         setIsSendingEmail(false);
@@ -146,18 +145,28 @@ const ViewInvoice: React.FC = () => {
     return null;
   }, [id, navigate]);
 
-  // Initial Load & Auto-Email Trigger
+  // Initial Load & Auto-Trigger
   useEffect(() => {
     let mounted = true;
     
     const loadAndCheckAutoSend = async () => {
         const data = await fetchInvoice();
         
-        // Check if we navigated here with a request to auto-send email (Creation flow)
-        if (data && mounted && location.state?.autoSendEmail) {
+        if (data && mounted) {
+            // Check if we navigated here with a request to auto-send email
+            if (location.state?.autoSendEmail) {
+                setTimeout(() => generateAndSendPDF(data, location.state.emailType || 'CREATED'), 500);
+            }
+            
+            // Check if we should open share modal immediately (e.g. from creation)
+            if (location.state?.openShare) {
+               setTimeout(() => setShowShareModal(true), 800);
+            }
+
             // Clear state so it doesn't fire on refresh
-            window.history.replaceState({}, document.title);
-            setTimeout(() => generateAndSendPDF(data, location.state.emailType || 'CREATED'), 500);
+            if (location.state?.autoSendEmail || location.state?.openShare) {
+                window.history.replaceState({}, document.title);
+            }
         }
     };
 

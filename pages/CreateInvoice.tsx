@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { InvoiceData, LineItem, PaymentStatus, Product, DocumentType, Customer } from '../types';
-import { PhotoIcon, PlusIcon, TrashIcon, DocumentTextIcon, ArrowPathIcon, ChevronLeftIcon, CheckCircleIcon, ChatBubbleLeftRightIcon, EyeIcon, UserPlusIcon, XMarkIcon } from '@heroicons/react/24/outline';
+import { PhotoIcon, PlusIcon, TrashIcon, DocumentTextIcon, ArrowPathIcon, ChevronLeftIcon, CheckCircleIcon, ChatBubbleLeftRightIcon, EyeIcon, UserPlusIcon, XMarkIcon, CalendarDaysIcon } from '@heroicons/react/24/outline';
 import { InvoiceService } from '../services/invoiceService';
 import { ProductService } from '../services/productService';
 import { CustomerService } from '../services/customerService';
@@ -398,8 +398,13 @@ const CreateInvoice: React.FC = () => {
         // Save to Backend/Storage
         await InvoiceService.saveInvoice(invoiceToSave);
         
-        // Navigate to Dashboard
-        navigate('/');
+        // Redirect to View Invoice page and trigger email/share workflow
+        navigate(`/view/${invoiceToSave.id}`, { 
+            state: { 
+                autoSendEmail: true,
+                openShare: true 
+            } 
+        });
         
     } catch (error) {
         console.error("Failed to save:", error);
@@ -448,7 +453,7 @@ const CreateInvoice: React.FC = () => {
                 disabled={isSaving}
                 className="bg-indigo-600 text-white px-5 py-2 rounded-lg font-medium text-sm hover:bg-indigo-700 transition-colors flex items-center gap-2 shadow-sm shadow-indigo-200"
              >
-                {isSaving ? 'Saving...' : 'Save Invoice'}
+                {isSaving ? 'Saving...' : 'Save & Send'}
              </button>
           </div>
         </div>
@@ -476,23 +481,35 @@ const CreateInvoice: React.FC = () => {
                             </div>
                         </div>
                         <div className="grid grid-cols-2 gap-4">
-                            <div>
-                                <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Date</label>
-                                <input 
-                                    type="date" 
-                                    className="w-full border border-gray-300 rounded-lg p-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
-                                    value={invoice.date}
-                                    onChange={(e) => handleChange('date', e.target.value)}
-                                />
+                            <div className="relative">
+                                <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2 flex items-center gap-1">
+                                    Date <span className="text-red-500">*</span>
+                                </label>
+                                <div className="relative">
+                                    <input 
+                                        type="date" 
+                                        required
+                                        className="w-full border border-gray-300 rounded-lg pl-3 pr-10 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none transition-shadow"
+                                        value={invoice.date}
+                                        onChange={(e) => handleChange('date', e.target.value)}
+                                    />
+                                    <CalendarDaysIcon className="w-5 h-5 absolute right-3 top-2 text-gray-400 pointer-events-none" />
+                                </div>
                             </div>
-                            <div>
-                                <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Due Date</label>
-                                <input 
-                                    type="date" 
-                                    className="w-full border border-gray-300 rounded-lg p-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
-                                    value={invoice.dueDate}
-                                    onChange={(e) => handleChange('dueDate', e.target.value)}
-                                />
+                            <div className="relative">
+                                <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2 flex items-center gap-1">
+                                    Due Date
+                                </label>
+                                <div className="relative">
+                                    <input 
+                                        type="date" 
+                                        min={invoice.date}
+                                        className="w-full border border-gray-300 rounded-lg pl-3 pr-10 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none transition-shadow"
+                                        value={invoice.dueDate}
+                                        onChange={(e) => handleChange('dueDate', e.target.value)}
+                                    />
+                                    <CalendarDaysIcon className="w-5 h-5 absolute right-3 top-2 text-gray-400 pointer-events-none" />
+                                </div>
                             </div>
                         </div>
                     </div>
