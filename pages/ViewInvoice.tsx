@@ -101,7 +101,7 @@ const ViewInvoice: React.FC = () => {
 
     const opt = {
         margin: 5,
-        filename: `${currentInvoice.invoiceNumber}.pdf`,
+        filename: `${currentInvoice.paidInvoiceNumber || currentInvoice.invoiceNumber}.pdf`,
         image: { type: 'jpeg', quality: 0.98 },
         html2canvas: { scale: 2, useCORS: true },
         jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
@@ -294,18 +294,34 @@ const ViewInvoice: React.FC = () => {
   const handlePaymentSuccess = async () => {
     if (!invoice) return;
     
-    showNotification("Payment Confirmed! Updating status...", 'success');
+    showNotification("Payment Confirmed! Generating Receipt...", 'success');
 
-    // 1. IMMEDIATE UI UPDATE (Hide Button, Show Badge)
-    const updatedInvoice = { ...invoice, status: PaymentStatus.PAID };
-    setInvoice(updatedInvoice);
+    // Wait a moment for the backend webhook/handler to finish writing to DB
+    // The backend generates the PaidInvoiceNumber
+    await new Promise(resolve => setTimeout(resolve, 1500));
 
-    // 2. Persist to Backend
-    await InvoiceService.updateStatus(invoice.id, PaymentStatus.PAID);
-
-    // 3. Auto-Send Email with PDF Receipt
-    // We pass 'updatedInvoice' directly because state updates might be async
-    generateAndSendPDF(updatedInvoice, 'PAID');
+    try {
+        // Fetch the updated invoice from backend to get the generated PaidInvoiceNumber
+        // We do NOT call updateStatus() because the payment gateway handler on backend already did it.
+        const freshInvoice = await InvoiceService.getInvoiceById(invoice.id);
+        
+        if (freshInvoice) {
+            setInvoice(freshInvoice);
+            // Send email with the fresh data (containing the new ID)
+            generateAndSendPDF(freshInvoice, 'PAID');
+        } else {
+            // Fallback (e.g. backend fetch failed, use local update without new number)
+            const updatedInvoice = { ...invoice, status: PaymentStatus.PAID };
+            setInvoice(updatedInvoice);
+            generateAndSendPDF(updatedInvoice, 'PAID');
+        }
+    } catch (e) {
+        console.error("Error fetching updated invoice:", e);
+        // Fallback
+        const updatedInvoice = { ...invoice, status: PaymentStatus.PAID };
+        setInvoice(updatedInvoice);
+        generateAndSendPDF(updatedInvoice, 'PAID');
+    }
   };
 
   // --- CANCEL HANDLER ---

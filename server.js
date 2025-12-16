@@ -217,15 +217,8 @@ app.post('/api/invoices', async (req, res) => {
     const connection = await pool.getConnection();
     
     // Check if we are marking as PAID (e.g. Cash payment)
-    let paidInvoiceNum = inv.paidInvoiceNumber;
-    
-    if (inv.status === 'PAID' && !paidInvoiceNum) {
-        // If coming as PAID but has no number, generate it (Cash flow)
-        // However, usually we handle this in specific payment endpoints. 
-        // If the user manually toggles to PAID in UI, we might want to generate it here.
-        // For safety, let's only generate if it's explicitly missing and status is PAID.
-        // But to avoid race conditions with payment gateways, typically gateways call update.
-        // If this is a manual save (from Create/Edit), we assume it's PENDING or update.
+    if (inv.status === 'PAID' && (!inv.paidInvoiceNumber || inv.paidInvoiceNumber === '')) {
+        inv.paidInvoiceNumber = await generatePaidInvoiceNumber();
     }
 
     try {
@@ -256,7 +249,6 @@ app.post('/api/invoices', async (req, res) => {
         
         if (inv.items && inv.items.length > 0) {
             // FIX: Shorten ID to avoid "Data too long" error (Limit 50 chars)
-            // Format: li_<timestamp>_<index> (e.g., li_1715432123456_0) -> ~20 chars
             const itemValues = inv.items.map((item, index) => [
                 `li_${Date.now()}_${index}`, 
                 inv.id, 
@@ -270,7 +262,7 @@ app.post('/api/invoices', async (req, res) => {
         }
 
         await connection.commit();
-        res.json({ success: true, id: inv.id });
+        res.json({ success: true, id: inv.id, paidInvoiceNumber: inv.paidInvoiceNumber });
 
     } catch (err) {
         await connection.rollback();
