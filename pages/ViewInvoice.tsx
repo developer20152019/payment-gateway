@@ -65,35 +65,6 @@ const ViewInvoice: React.FC = () => {
       }
   };
 
-  // 1. Manual Share (Opens Client App)
-  const handleWhatsAppShareApp = () => {
-    if (!invoice || !invoice.buyerPhone) {
-        showNotification("Client phone number missing.", "error");
-        return;
-    }
-
-    // Clean phone number: remove all non-digits
-    let phone = invoice.buyerPhone.replace(/[^0-9]/g, '');
-    
-    // If it's a 10-digit number (common in India), append country code
-    if (phone.length === 10) {
-        phone = '91' + phone;
-    }
-
-    const url = window.location.href;
-    const docType = invoice.type === 'QUOTATION' ? 'estimate' : 'invoice';
-    const invoiceNum = invoice.paidInvoiceNumber || invoice.invoiceNumber;
-    
-    // Construct text
-    const text = `Dear ${invoice.buyerName},\n\nThank you for contacting us. Your ${docType} #${invoiceNum} can be paid, viewed, printed and downloaded as PDF from the link below.\n\n${url}`;
-
-    // Encode text component for URL
-    const encodedText = encodeURIComponent(text);
-
-    // Open WhatsApp API link
-    window.open(`https://api.whatsapp.com/send?phone=${phone}&text=${encodedText}`, '_blank');
-  };
-
   // Reusable PDF E-mailing Function
   const generateAndSendPDF = useCallback(async (currentInvoice: InvoiceData, triggerType: 'CREATED' | 'PAID') => {
     setIsSendingEmail(true);
@@ -445,15 +416,6 @@ const ViewInvoice: React.FC = () => {
                  </p>
                  
                  <div className="space-y-3">
-                    {/* Share via App (Manual fallback) */}
-                    <button 
-                        onClick={handleWhatsAppShareApp}
-                        className="w-full py-3 bg-[#25D366] hover:bg-[#20bd5a] text-white font-bold rounded-xl flex items-center justify-center gap-2 shadow-lg shadow-green-200 transition-colors"
-                    >
-                        <ChatBubbleLeftRightIcon className="w-6 h-6" />
-                        Share Manually via WhatsApp
-                    </button>
-                    
                     <button 
                         onClick={handleCopyLink}
                         className="w-full py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold rounded-xl flex items-center justify-center gap-2 transition-colors"
