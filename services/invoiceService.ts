@@ -13,6 +13,7 @@ const mapInvoiceFromBackend = (data: any): InvoiceData => {
   return {
     id: data.id || data.ID,
     invoiceNumber: data.invoiceNumber || data.InvoiceNumber,
+    paidInvoiceNumber: data.paidInvoiceNumber || data.PaidInvoiceNumber,
     type: data.type || data.Type || 'INVOICE',
     date: data.date || data.Date,
     dueDate: data.dueDate || data.DueDate,
@@ -162,6 +163,11 @@ export const InvoiceService = {
         if (gateway) {
             invoice.paymentGateway = gateway;
         }
+        
+        // If we are marking as PAID (e.g. manual cash), we might want to let server generate the ID
+        // But the server endpoint handles ID generation on verification usually.
+        // If this is manual update via this service, pass it back.
+        
         // 2. Update backend
         const saveResponse = await fetch(`${API_BASE}/invoices`, {
           method: 'POST',
@@ -224,13 +230,13 @@ export const InvoiceService = {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
             to: invoice.buyerEmail,
-            subject: `${invoice.type === 'QUOTATION' ? 'Quotation' : 'Invoice'} #${invoice.invoiceNumber} from ${invoice.businessName}`,
+            subject: `${invoice.type === 'QUOTATION' ? 'Quotation' : 'Invoice'} #${invoice.paidInvoiceNumber || invoice.invoiceNumber} from ${invoice.businessName}`,
             body: `Please find the attached ${invoice.type.toLowerCase()} PDF.`,
             link: link,
             type: 'MANUAL_PDF',
             attachments: [
                 {
-                    filename: `${invoice.invoiceNumber}.pdf`,
+                    filename: `${invoice.paidInvoiceNumber || invoice.invoiceNumber}.pdf`,
                     content: base64Content,
                     encoding: 'base64'
                 }

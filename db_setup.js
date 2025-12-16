@@ -29,6 +29,7 @@ async function setupDatabase() {
             CREATE TABLE IF NOT EXISTS Invoices (
                 ID VARCHAR(50) PRIMARY KEY,
                 InvoiceNumber VARCHAR(50),
+                PaidInvoiceNumber VARCHAR(50), 
                 Type VARCHAR(20) DEFAULT 'INVOICE',
                 Date DATE,
                 DueDate DATE,
@@ -67,6 +68,7 @@ async function setupDatabase() {
         try { await connection.query("ALTER TABLE Invoices ADD COLUMN BuyerShippingAddress TEXT"); } catch(e) {}
         try { await connection.query("ALTER TABLE Invoices ADD COLUMN PlaceOfSupply VARCHAR(100)"); } catch(e) {}
         try { await connection.query("ALTER TABLE Invoices ADD COLUMN BuyerPinCode VARCHAR(20)"); } catch(e) {}
+        try { await connection.query("ALTER TABLE Invoices ADD COLUMN PaidInvoiceNumber VARCHAR(50)"); } catch(e) {}
 
         console.log("   ✅ Table 'Invoices' ensured.");
 

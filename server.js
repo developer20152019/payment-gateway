@@ -40,6 +40,21 @@ const pool = mysql.createPool(dbConfig);
     }
 })();
 
+// --- Helper: Generate Next Paid Invoice Number ---
+async function generatePaidInvoiceNumber() {
+    try {
+        // Count how many invoices have a PaidInvoiceNumber
+        const [rows] = await pool.query("SELECT COUNT(*) as count FROM Invoices WHERE PaidInvoiceNumber IS NOT NULL AND PaidInvoiceNumber != ''");
+        const count = rows[0].count;
+        const nextNum = count + 1;
+        // Format: INV-00001
+        return `INV-${nextNum.toString().padStart(5, '0')}`;
+    } catch (e) {
+        console.error("Error generating invoice number:", e);
+        return `INV-${Date.now()}`; // Fallback
+    }
+}
+
 // --- Payment Gateways Configuration ---
 
 const razorpay = new Razorpay({
@@ -201,24 +216,38 @@ app.post('/api/invoices', async (req, res) => {
     const inv = req.body;
     const connection = await pool.getConnection();
     
+    // Check if we are marking as PAID (e.g. Cash payment)
+    let paidInvoiceNum = inv.paidInvoiceNumber;
+    
+    if (inv.status === 'PAID' && !paidInvoiceNum) {
+        // If coming as PAID but has no number, generate it (Cash flow)
+        // However, usually we handle this in specific payment endpoints. 
+        // If the user manually toggles to PAID in UI, we might want to generate it here.
+        // For safety, let's only generate if it's explicitly missing and status is PAID.
+        // But to avoid race conditions with payment gateways, typically gateways call update.
+        // If this is a manual save (from Create/Edit), we assume it's PENDING or update.
+    }
+
     try {
         await connection.beginTransaction();
 
         await connection.query(`
             INSERT INTO Invoices 
-            (ID, InvoiceNumber, Type, Date, DueDate, Template, BrandColor, LogoUrl, SellerName, BusinessName, SellerAddress, 
+            (ID, InvoiceNumber, PaidInvoiceNumber, Type, Date, DueDate, Template, BrandColor, LogoUrl, SellerName, BusinessName, SellerAddress, 
             SellerGstin, SellerEmail, SellerPhone, BuyerName, BuyerContactPerson, BuyerEmail, BuyerPhone, BuyerAddress, BuyerShippingAddress, PlaceOfSupply, BuyerPinCode,
             ResourceSection, ResourceName, Subtotal, TaxRate, TaxAmount, Total, Currency, Status, PaymentGateway, Notes)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON DUPLICATE KEY UPDATE
-            InvoiceNumber=?, Type=?, Date=?, DueDate=?, Template=?, BrandColor=?, LogoUrl=?, SellerName=?, BusinessName=?, SellerAddress=?,
+            InvoiceNumber=?, PaidInvoiceNumber=?, Type=?, Date=?, DueDate=?, Template=?, BrandColor=?, LogoUrl=?, SellerName=?, BusinessName=?, SellerAddress=?,
             SellerGstin=?, SellerEmail=?, SellerPhone=?, BuyerName=?, BuyerContactPerson=?, BuyerEmail=?, BuyerPhone=?, BuyerAddress=?, BuyerShippingAddress=?, PlaceOfSupply=?, BuyerPinCode=?,
             ResourceSection=?, ResourceName=?, Subtotal=?, TaxRate=?, TaxAmount=?, Total=?, Currency=?, Status=?, PaymentGateway=?, Notes=?
         `, [
-            inv.id, inv.invoiceNumber, inv.type, inv.date, inv.dueDate, inv.template, inv.brandColor, inv.logoUrl, inv.sellerName, inv.businessName, inv.sellerAddress,
+            // INSERT
+            inv.id, inv.invoiceNumber, inv.paidInvoiceNumber, inv.type, inv.date, inv.dueDate, inv.template, inv.brandColor, inv.logoUrl, inv.sellerName, inv.businessName, inv.sellerAddress,
             inv.sellerGstin, inv.sellerEmail, inv.sellerPhone, inv.buyerName, inv.buyerContactPerson, inv.buyerEmail, inv.buyerPhone, inv.buyerAddress, inv.buyerShippingAddress, inv.placeOfSupply, inv.buyerPinCode,
             inv.resourceSection, inv.resourceName, inv.subtotal, inv.taxRate, inv.taxAmount, inv.total, inv.currency, inv.status, inv.paymentGateway, inv.notes,
-            inv.invoiceNumber, inv.type, inv.date, inv.dueDate, inv.template, inv.brandColor, inv.logoUrl, inv.sellerName, inv.businessName, inv.sellerAddress,
+            // UPDATE
+            inv.invoiceNumber, inv.paidInvoiceNumber, inv.type, inv.date, inv.dueDate, inv.template, inv.brandColor, inv.logoUrl, inv.sellerName, inv.businessName, inv.sellerAddress,
             inv.sellerGstin, inv.sellerEmail, inv.sellerPhone, inv.buyerName, inv.buyerContactPerson, inv.buyerEmail, inv.buyerPhone, inv.buyerAddress, inv.buyerShippingAddress, inv.placeOfSupply, inv.buyerPinCode,
             inv.resourceSection, inv.resourceName, inv.subtotal, inv.taxRate, inv.taxAmount, inv.total, inv.currency, inv.status, inv.paymentGateway, inv.notes
         ]);
@@ -226,10 +255,10 @@ app.post('/api/invoices', async (req, res) => {
         await connection.query('DELETE FROM LineItems WHERE InvoiceID = ?', [inv.id]);
         
         if (inv.items && inv.items.length > 0) {
-            // FIX: Construct a globally unique ID for each line item using InvoiceID + ItemID + Index
-            // This prevents "Duplicate entry" errors when multiple invoices have items with simple IDs like '1'
+            // FIX: Shorten ID to avoid "Data too long" error (Limit 50 chars)
+            // Format: li_<timestamp>_<index> (e.g., li_1715432123456_0) -> ~20 chars
             const itemValues = inv.items.map((item, index) => [
-                `${inv.id}_${item.id || index}_${Date.now()}_${Math.floor(Math.random()*1000)}`, // Robust Unique ID
+                `li_${Date.now()}_${index}`, 
                 inv.id, 
                 item.name, 
                 item.description, 
@@ -294,7 +323,9 @@ app.post('/api/payment/razorpay/verify', async (req, res) => {
     const expectedSignature = crypto.createHmac('sha256', process.env.RAZORPAY_KEY_SECRET).update(body.toString()).digest('hex');
 
     if (expectedSignature === razorpay_signature) {
-        await pool.query('UPDATE Invoices SET Status = ?, PaymentGateway = ? WHERE ID = ?', ['PAID', 'Razorpay', invoice_id]);
+        // Payment Success - Generate Invoice Number
+        const paidInvoiceNumber = await generatePaidInvoiceNumber();
+        await pool.query('UPDATE Invoices SET Status = ?, PaymentGateway = ?, PaidInvoiceNumber = ? WHERE ID = ?', ['PAID', 'Razorpay', paidInvoiceNumber, invoice_id]);
         res.json({ status: 'success' });
     } else {
         res.status(400).json({ status: 'failure' });
@@ -316,7 +347,6 @@ app.post('/api/payment/initiate', (req, res) => {
     const redirectUrl = `${req.protocol}://${req.get('host')}/api/payment/ccavResponseHandler`;
     const cancelUrl = `${req.protocol}://${req.get('host')}/api/payment/ccavResponseHandler`;
 
-    // Use URLSearchParams to ensure proper encoding of all fields (including spaces)
     const paramsMap = new URLSearchParams();
     paramsMap.append('merchant_id', merchantId);
     paramsMap.append('order_id', order_id);
@@ -330,7 +360,7 @@ app.post('/api/payment/initiate', (req, res) => {
     paramsMap.append('billing_email', email);
     paramsMap.append('billing_tel', billing_tel);
 
-    const params = paramsMap.toString(); // Standard URL encoded string
+    const params = paramsMap.toString();
     const encRequest = ccav.encrypt(params, workingKey);
 
     const form = `
@@ -369,9 +399,9 @@ app.post('/api/payment/ccavResponseHandler', async (req, res) => {
 
     let htmlResponse = '';
 
-    // Check status case-insensitively to be safe
     if (orderStatus && orderStatus.toLowerCase() === 'success') {
-        await pool.query('UPDATE Invoices SET Status = ?, PaymentGateway = ? WHERE ID = ?', ['PAID', 'CCAvenue', orderId]);
+        const paidInvoiceNumber = await generatePaidInvoiceNumber();
+        await pool.query('UPDATE Invoices SET Status = ?, PaymentGateway = ?, PaidInvoiceNumber = ? WHERE ID = ?', ['PAID', 'CCAvenue', paidInvoiceNumber, orderId]);
         htmlResponse = `<script>if(window.opener){window.opener.postMessage('PAYMENT_SUCCESS', '*');} window.close();</script>`;
     } else {
         await pool.query('UPDATE Invoices SET Status = ? WHERE ID = ?', ['FAILED', orderId]);

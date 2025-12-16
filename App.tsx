@@ -1,24 +1,40 @@
 import React from 'react';
-import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { HashRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import CreateInvoice from './pages/CreateInvoice';
 import ViewInvoice from './pages/ViewInvoice';
 import Dashboard from './pages/Dashboard';
 import Products from './pages/Products';
 import Customers from './pages/Customers';
 import Settings from './pages/Settings';
+import Login from './pages/Login';
+
+// Protected Route Component
+const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+    const isAuthenticated = localStorage.getItem('isAuthenticated') === 'true';
+    if (!isAuthenticated) {
+        return <Navigate to="/login" replace />;
+    }
+    return <>{children}</>;
+};
 
 const App: React.FC = () => {
   return (
     <HashRouter>
       <div className="min-h-screen bg-gray-50 text-gray-900 font-sans selection:bg-indigo-100 selection:text-indigo-800">
         <Routes>
-          <Route path="/" element={<Dashboard />} />
-          <Route path="/create" element={<CreateInvoice />} />
-          <Route path="/edit/:id" element={<CreateInvoice />} />
+          <Route path="/login" element={<Login />} />
+          
+          {/* Public Route (View Invoice) */}
           <Route path="/view/:id" element={<ViewInvoice />} />
-          <Route path="/products" element={<Products />} />
-          <Route path="/customers" element={<Customers />} />
-          <Route path="/settings" element={<Settings />} />
+
+          {/* Protected Routes */}
+          <Route path="/" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+          <Route path="/create" element={<ProtectedRoute><CreateInvoice /></ProtectedRoute>} />
+          <Route path="/edit/:id" element={<ProtectedRoute><CreateInvoice /></ProtectedRoute>} />
+          <Route path="/products" element={<ProtectedRoute><Products /></ProtectedRoute>} />
+          <Route path="/customers" element={<ProtectedRoute><Customers /></ProtectedRoute>} />
+          <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
+          
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </div>

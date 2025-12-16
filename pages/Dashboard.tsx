@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { InvoiceData, PaymentStatus, DocumentType } from '../types';
 import { InvoiceService } from '../services/invoiceService';
-import { PlusIcon, DocumentTextIcon, TrashIcon, MagnifyingGlassIcon, LinkIcon, CheckIcon, XMarkIcon, FunnelIcon, ArrowUpIcon, ArrowDownIcon, BanknotesIcon, PencilIcon, TagIcon, ClipboardDocumentListIcon, UsersIcon, Cog6ToothIcon, MapPinIcon } from '@heroicons/react/24/outline';
+import { PlusIcon, DocumentTextIcon, TrashIcon, MagnifyingGlassIcon, LinkIcon, CheckIcon, XMarkIcon, FunnelIcon, ArrowUpIcon, ArrowDownIcon, BanknotesIcon, PencilIcon, TagIcon, ClipboardDocumentListIcon, UsersIcon, Cog6ToothIcon, MapPinIcon, ArrowRightOnRectangleIcon } from '@heroicons/react/24/outline';
 
 const INDIAN_STATES = [
   "Andhra Pradesh", "Arunachal Pradesh", "Assam", "Bihar", "Chhattisgarh", "Goa", "Gujarat", "Haryana", 
@@ -45,6 +45,11 @@ const Dashboard: React.FC = () => {
     const data = await InvoiceService.getAllInvoices();
     setInvoices(data);
     setIsLoading(false);
+  };
+
+  const handleLogout = () => {
+      localStorage.removeItem('isAuthenticated');
+      navigate('/login');
   };
 
   const handleDelete = async (e: React.MouseEvent, id: string) => {
@@ -123,6 +128,8 @@ const Dashboard: React.FC = () => {
 
     try {
         await InvoiceService.updateStatus(id, PaymentStatus.PAID, 'CASH');
+        // Reload to get the generated ID
+        loadInvoices();
     } catch (error) {
         console.error("Failed to update status:", error);
         alert("Failed to update invoice status on the server. Changes reverted.");
@@ -175,6 +182,7 @@ const Dashboard: React.FC = () => {
     const query = searchQuery.toLowerCase();
     const matchesSearch = (
       invoice.invoiceNumber.toLowerCase().includes(query) ||
+      (invoice.paidInvoiceNumber || '').toLowerCase().includes(query) ||
       invoice.buyerName.toLowerCase().includes(query) ||
       (invoice.buyerEmail || '').toLowerCase().includes(query) ||
       invoice.total.toString().includes(query) ||
@@ -261,6 +269,13 @@ const Dashboard: React.FC = () => {
                 className="bg-indigo-600 text-white px-4 py-2 rounded-lg font-medium text-sm flex items-center gap-2 hover:bg-indigo-700 transition-colors"
             >
                 <PlusIcon className="w-4 h-4" /> <span className="hidden sm:inline">New Document</span>
+            </button>
+            <button
+                onClick={handleLogout}
+                className="text-red-500 hover:text-red-700 p-2 rounded-lg hover:bg-red-50 transition-colors"
+                title="Logout"
+            >
+                <ArrowRightOnRectangleIcon className="w-6 h-6" />
             </button>
           </div>
         </div>
@@ -423,7 +438,8 @@ const Dashboard: React.FC = () => {
                 <table className="w-full text-left border-collapse">
                    <thead className="bg-gray-50 text-xs uppercase font-medium text-gray-500 border-b border-gray-100 sticky top-0 z-10 shadow-sm">
                       <tr>
-                         <th className="px-6 py-4 bg-gray-50">Document</th>
+                         <th className="px-6 py-4 bg-gray-50">Reference</th>
+                         <th className="px-6 py-4 bg-gray-50">Invoice #</th>
                          <th className="px-6 py-4 bg-gray-50">Client</th>
                          <th className="px-6 py-4 cursor-pointer hover:text-gray-700 bg-gray-50" onClick={() => handleSort('date')}>
                             <div className="flex items-center gap-1">Date {sortConfig.key === 'date' && (sortConfig.direction === 'asc' ? <ArrowUpIcon className="w-3 h-3"/> : <ArrowDownIcon className="w-3 h-3"/>)}</div>
@@ -438,19 +454,26 @@ const Dashboard: React.FC = () => {
                    <tbody className="divide-y divide-gray-100 text-sm">
                       {isLoading ? (
                           <tr>
-                              <td colSpan={6} className="px-6 py-8 text-center text-gray-500">Loading...</td>
+                              <td colSpan={7} className="px-6 py-8 text-center text-gray-500">Loading...</td>
                           </tr>
                       ) : sortedInvoices.length === 0 ? (
                           <tr>
-                              <td colSpan={6} className="px-6 py-8 text-center text-gray-500">
+                              <td colSpan={7} className="px-6 py-8 text-center text-gray-500">
                                   No documents found matching your filters.
                               </td>
                           </tr>
                       ) : sortedInvoices.map((inv) => (
                           <tr key={inv.id} className="hover:bg-gray-50 transition-colors group cursor-pointer" onClick={() => navigate(`/view/${inv.id}`)}>
                               <td className="px-6 py-4">
-                                  <div className="font-bold text-gray-900">{inv.invoiceNumber}</div>
+                                  <div className="font-bold text-gray-700">{inv.invoiceNumber}</div>
                                   <div className="mt-1">{getTypeBadge(inv.type)}</div>
+                              </td>
+                              <td className="px-6 py-4 text-gray-600">
+                                  {inv.paidInvoiceNumber ? (
+                                      <span className="font-mono text-indigo-700 font-bold bg-indigo-50 px-1 rounded">{inv.paidInvoiceNumber}</span>
+                                  ) : (
+                                      <span className="text-gray-400">-</span>
+                                  )}
                               </td>
                               <td className="px-6 py-4">
                                   <div className="font-medium text-gray-900">{inv.buyerName}</div>

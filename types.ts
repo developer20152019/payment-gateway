@@ -53,6 +53,7 @@ export interface LineItem {
 export interface InvoiceData {
   id: string;
   invoiceNumber: string;
+  paidInvoiceNumber?: string; // Sequential ID assigned after payment
   type: DocumentType; 
   date: string;
   dueDate: string;
@@ -78,7 +79,7 @@ export interface InvoiceData {
   buyerAddress: string;
   buyerShippingAddress?: string; 
   placeOfSupply?: string; 
-  buyerPinCode?: string; // New
+  buyerPinCode?: string;
 
   // Internal Resource Info (Not shown on Invoice)
   resourceSection?: string;

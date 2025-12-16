@@ -107,6 +107,14 @@ export const InvoicePreview: React.FC<Props> = ({ invoice }) => {
              <span className="font-bold text-gray-800">Ref #</span>
              <span className="text-gray-600 font-medium break-all">{invoice.invoiceNumber}</span>
              
+             {/* Show Invoice Number ONLY if PAID */}
+             {invoice.status === PaymentStatus.PAID && invoice.paidInvoiceNumber && (
+                 <>
+                    <span className="font-bold text-indigo-700">Invoice #</span>
+                    <span className="text-indigo-700 font-bold font-mono">{invoice.paidInvoiceNumber}</span>
+                 </>
+             )}
+
              <span className="font-bold text-gray-800">Date</span>
              <span className="text-gray-600 font-medium">{invoice.date}</span>
              
