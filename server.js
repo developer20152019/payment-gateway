@@ -56,21 +56,27 @@ async function generatePaidInvoiceNumber() {
 }
 
 // --- Helper: Format ISO String to MySQL DATETIME in IST (India Standard Time) ---
+// Returns 'YYYY-MM-DD HH:MM:SS'
 function toMysqlDateTime(isoString) {
     if (!isoString) return null;
     try {
         const date = new Date(isoString);
         if (isNaN(date.getTime())) return null;
 
-        // IST is UTC + 5:30
-        const istOffsetMs = (5 * 60 + 30) * 60 * 1000; 
-        const istDate = new Date(date.getTime() + istOffsetMs);
+        // Calculate IST time (UTC + 5:30)
+        // 5.5 hours * 60 min * 60 sec * 1000 ms = 19800000 ms
+        const offset = 19800000; 
+        const istDate = new Date(date.getTime() + offset);
 
-        // toISOString returns UTC, but since we shifted the time manually by 5.5h,
-        // the "UTC" string output will actually match the IST wall clock time.
-        // We slice to remove 'T', 'Z' and milliseconds.
-        // Result format: "YYYY-MM-DD HH:MM:SS"
-        return istDate.toISOString().slice(0, 19).replace('T', ' ');
+        // Format manually to avoid ISO string confusion regarding 'Z'
+        const yyyy = istDate.getUTCFullYear();
+        const mm = String(istDate.getUTCMonth() + 1).padStart(2, '0');
+        const dd = String(istDate.getUTCDate()).padStart(2, '0');
+        const hh = String(istDate.getUTCHours()).padStart(2, '0');
+        const min = String(istDate.getUTCMinutes()).padStart(2, '0');
+        const ss = String(istDate.getUTCSeconds()).padStart(2, '0');
+
+        return `${yyyy}-${mm}-${dd} ${hh}:${min}:${ss}`;
     } catch (e) {
         console.error("Date conversion error:", e);
         return null;

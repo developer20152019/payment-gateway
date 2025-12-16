@@ -96,8 +96,9 @@ const CreateInvoice: React.FC = () => {
   const [isSaving, setIsSaving] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   
-  // Autocomplete State
+  // States
   const [showSuggestions, setShowSuggestions] = useState(false);
+  const [shippingSameAsBilling, setShippingSameAsBilling] = useState(false);
 
   // New Customer Modal State
   const [showAddCustomerModal, setShowAddCustomerModal] = useState(false);
@@ -136,6 +137,12 @@ const CreateInvoice: React.FC = () => {
                   placeOfSupply: existingInvoice.placeOfSupply || '',
                   buyerPinCode: existingInvoice.buyerPinCode || ''
               });
+              
+              // Check if billing and shipping are same on load
+              if (existingInvoice.buyerAddress && existingInvoice.buyerShippingAddress && existingInvoice.buyerAddress === existingInvoice.buyerShippingAddress) {
+                  setShippingSameAsBilling(true);
+              }
+
               setIsEditMode(true);
             } else {
               alert("Invoice not found.");
@@ -170,6 +177,13 @@ const CreateInvoice: React.FC = () => {
     };
     init();
   }, [id, navigate]);
+
+  // Sync Shipping with Billing if checked
+  useEffect(() => {
+      if (shippingSameAsBilling) {
+          setInvoice(prev => ({ ...prev, buyerShippingAddress: prev.buyerAddress }));
+      }
+  }, [invoice.buyerAddress, shippingSameAsBilling]);
 
   const handleChange = (section: keyof InvoiceData, value: any) => {
      setInvoice({ ...invoice, [section]: value });
@@ -250,6 +264,7 @@ const CreateInvoice: React.FC = () => {
   };
 
   const handleCustomerSelect = (customer: Customer) => {
+      const isSameAddress = customer.shippingAddress === customer.address || !customer.shippingAddress;
       setInvoice(prev => ({
           ...prev,
           buyerName: customer.name,
@@ -257,10 +272,11 @@ const CreateInvoice: React.FC = () => {
           buyerPhone: customer.phone,
           buyerAddress: customer.address,
           buyerContactPerson: customer.contactPerson || '',
-          buyerShippingAddress: customer.shippingAddress || customer.address, // Default to billing if empty
+          buyerShippingAddress: customer.shippingAddress || customer.address, 
           placeOfSupply: customer.placeOfSupply || '',
           buyerPinCode: customer.pinCode || ''
       }));
+      setShippingSameAsBilling(isSameAddress);
       setShowSuggestions(false);
   };
 
@@ -360,6 +376,7 @@ const CreateInvoice: React.FC = () => {
           }
           setInvoice(fresh);
           setIsEditMode(false);
+          setShippingSameAsBilling(false);
           navigate('/create');
           window.scrollTo(0, 0);
           setIsLoading(false);
@@ -620,8 +637,36 @@ const CreateInvoice: React.FC = () => {
                         <input type="email" placeholder="Email Address" className="border border-gray-300 rounded-lg p-2 text-sm outline-none focus:border-indigo-500" value={invoice.buyerEmail} onChange={(e) => handleChange('buyerEmail', e.target.value)} />
                         <input type="tel" placeholder="Phone Number" className="border border-gray-300 rounded-lg p-2 text-sm outline-none focus:border-indigo-500" value={invoice.buyerPhone} onChange={(e) => handlePhoneChange('buyerPhone', e.target.value)} />
                         <div className="md:col-span-2">
-                            <textarea rows={2} placeholder="Billing Address" className="w-full border border-gray-300 rounded-lg p-2 text-sm outline-none focus:border-indigo-500 resize-none" value={invoice.buyerAddress} onChange={(e) => handleChange('buyerAddress', e.target.value)}></textarea>
+                            <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Billing Address</label>
+                            <textarea rows={2} placeholder="Street, Building, Area..." className="w-full border border-gray-300 rounded-lg p-2 text-sm outline-none focus:border-indigo-500 resize-none" value={invoice.buyerAddress} onChange={(e) => handleChange('buyerAddress', e.target.value)}></textarea>
                         </div>
+                        
+                        {/* Shipping Address */}
+                        <div className="md:col-span-2">
+                            <div className="flex items-center gap-2 mb-2">
+                                <input 
+                                    type="checkbox" 
+                                    id="sameAsBilling"
+                                    className="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500 cursor-pointer"
+                                    checked={shippingSameAsBilling}
+                                    onChange={(e) => setShippingSameAsBilling(e.target.checked)}
+                                />
+                                <label htmlFor="sameAsBilling" className="text-xs font-bold text-gray-500 uppercase tracking-wider cursor-pointer select-none">
+                                    Shipping Address same as Billing
+                                </label>
+                            </div>
+                            
+                            {!shippingSameAsBilling && (
+                                <textarea 
+                                    rows={2} 
+                                    placeholder="Shipping Address" 
+                                    className="w-full border border-gray-300 rounded-lg p-2 text-sm outline-none focus:border-indigo-500 resize-none animate-fade-in"
+                                    value={invoice.buyerShippingAddress} 
+                                    onChange={(e) => handleChange('buyerShippingAddress', e.target.value)}
+                                ></textarea>
+                            )}
+                        </div>
+
                         <div>
                             <input type="text" placeholder="Place of Supply (State)" className="w-full border border-gray-300 rounded-lg p-2 text-sm outline-none focus:border-indigo-500" value={invoice.placeOfSupply} onChange={(e) => handleChange('placeOfSupply', e.target.value)} />
                         </div>
