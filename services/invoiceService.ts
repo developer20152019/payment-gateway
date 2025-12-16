@@ -312,7 +312,7 @@ export const InvoiceService = {
     }
   },
 
-  sendWhatsAppNotification: async (invoice: InvoiceData): Promise<void> => {
+  sendWhatsAppNotification: async (invoice: InvoiceData, triggerType: 'CREATED' | 'PAID' = 'CREATED'): Promise<void> => {
     const link = `${window.location.origin}${window.location.pathname}#/view/${invoice.id}`;
     const docType = invoice.type === 'QUOTATION' ? 'Estimate' : 'Invoice';
     const number = invoice.paidInvoiceNumber || invoice.invoiceNumber;
@@ -327,7 +327,9 @@ export const InvoiceService = {
             invoiceNumber: number,
             link: link,
             amount: amount,
-            businessName: invoice.businessName
+            businessName: invoice.businessName,
+            buyerName: invoice.buyerName,
+            triggerType: triggerType
         })
     });
 

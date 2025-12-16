@@ -123,10 +123,11 @@ const ViewInvoice: React.FC = () => {
         // 1. Send Email (Backend sends email with attachment)
         await InvoiceService.sendPdfByEmail(currentInvoice, pdfBase64);
         
-        // 2. Send WhatsApp Automatically (Backend sends template message)
+        // 2. Send WhatsApp Automatically (Backend sends template message via YCloud)
         showNotification("Email sent. Sending WhatsApp...", 'info');
         try {
-            await InvoiceService.sendWhatsAppNotification(currentInvoice);
+            // Pass triggerType so backend selects the correct template (inv_quote_status vs payment_rcv_inv)
+            await InvoiceService.sendWhatsAppNotification(currentInvoice, triggerType);
             showNotification("Email and WhatsApp sent successfully!", 'success');
         } catch (waError) {
             console.error("WhatsApp Send Failed:", waError);

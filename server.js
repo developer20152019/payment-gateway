@@ -332,60 +332,106 @@ app.post('/api/notify', async (req, res) => {
     res.json({ success: true });
 });
 
-// --- WHATSAPP CLOUD API ---
+// --- YCLOUD WHATSAPP API ---
 app.post('/api/whatsapp/send', async (req, res) => {
-    const { to, type, invoiceNumber, link, amount, businessName } = req.body;
-    const token = process.env.WHATSAPP_TOKEN;
-    const phoneId = process.env.WHATSAPP_PHONE_ID;
+    const { to, type, invoiceNumber, link, amount, buyerName, triggerType } = req.body;
+    const apiKey = process.env.YCLOUD_API_KEY || '658772b9d79'; // Use env or fallback provided
+    const fromNumber = '+918310342294';
 
-    // Sanitize phone number (remove +, spaces, hyphens)
-    // WhatsApp Cloud API expects country code without +
-    const cleanPhone = to ? to.replace(/[^0-9]/g, '') : '';
+    if (!apiKey) {
+        console.warn("⚠️ YCloud API Key missing in .env (YCLOUD_API_KEY)");
+        return res.json({ success: true, message: "Stub: API Key missing" });
+    }
 
-    console.log(`\n📱 WhatsApp Request: ${cleanPhone}`);
+    // Format phone: remove non-digits, ensure country code.
+    // YCloud needs a proper formatted number. Assuming frontend sends valid number.
+    let recipient = to ? to.replace(/[^0-9]/g, '') : '';
+    // Basic fix for Indian numbers if missing country code
+    if (recipient.length === 10) recipient = '91' + recipient;
+    if (!recipient.startsWith('+')) recipient = '+' + recipient;
 
-    if (!token || !phoneId) {
-        console.warn("⚠️ WhatsApp Credentials Missing in .env (WHATSAPP_TOKEN, WHATSAPP_PHONE_ID)");
-        // Return a mock success so frontend doesn't crash, but log error
-        return res.json({ success: true, message: "Stub mode: Credentials not set" });
+    let payload = {};
+
+    if (triggerType === 'PAID') {
+        // Template: payment_rcv_inv
+        payload = {
+            from: fromNumber,
+            to: recipient,
+            type: "template",
+            template: {
+                name: "payment_rcv_inv",
+                language: { code: "en", policy: "deterministic" },
+                components: [
+                    {
+                        type: "header",
+                        parameters: [
+                            {
+                                type: "document",
+                                document: {
+                                    link: link, 
+                                    filename: `Invoice_${invoiceNumber}.pdf`
+                                }
+                            }
+                        ]
+                    },
+                    {
+                        type: "body",
+                        parameters: [
+                            { type: "text", text: buyerName || "Customer" }, // Var 1
+                            { type: "text", text: invoiceNumber },           // Var 2
+                            { type: "text", text: amount }                   // Var 3
+                        ]
+                    }
+                ]
+            }
+        };
+    } else {
+        // Template: inv_quote_status (Default for Created)
+        payload = {
+            from: fromNumber,
+            to: recipient,
+            type: "template",
+            template: {
+                name: "inv_quote_status",
+                language: { code: "en", "policy": "deterministic" },
+                components: [
+                    {
+                        type: "body",
+                        parameters: [
+                            { type: "text", text: buyerName || "Customer" }, // Var 1
+                            { type: "text", text: type },                    // Var 2 (Estimate/Invoice)
+                            { type: "text", text: invoiceNumber },           // Var 3
+                            { type: "text", text: link }                     // Var 4
+                        ]
+                    }
+                ]
+            }
+        };
     }
 
     try {
-        // Construct the message payload
-        const payload = {
-            messaging_product: "whatsapp",
-            recipient_type: "individual",
-            to: cleanPhone,
-            type: "text",
-            text: {
-                // NOTE: Cloud API allows free-form text ONLY if the user has messaged you within 24h.
-                // Otherwise, you MUST use a template. For simplicity here, we assume a session is open or test mode.
-                body: `Dear Customer,\n\nPlease find your ${type} #${invoiceNumber} for ${amount}.\n\nView here: ${link}\n\nRegards,\n${businessName}`
-            }
-        };
-
-        const response = await fetch(`https://graph.facebook.com/v17.0/${phoneId}/messages`, {
+        console.log(`\n📱 Sending WhatsApp (${triggerType || 'CREATED'}) to ${recipient}...`);
+        const response = await fetch('https://api.ycloud.com/v2/whatsapp/messages/sendDirectly', {
             method: 'POST',
             headers: {
-                'Authorization': `Bearer ${token}`,
-                'Content-Type': 'application/json'
+                'Content-Type': 'application/json',
+                'X-API-Key': apiKey
             },
             body: JSON.stringify(payload)
         });
-        
+
         const data = await response.json();
         
-        if (data.error) {
-            console.error("❌ WhatsApp API Error:", data.error);
-            // Return 400 so frontend knows it failed
-            return res.status(400).json({ error: data.error.message });
+        if (!response.ok) {
+            console.error("❌ YCloud Error:", JSON.stringify(data));
+            return res.status(response.status).json(data);
         }
 
-        console.log("✅ WhatsApp Message Sent ID:", data.messages ? data.messages[0].id : 'Unknown');
+        console.log("✅ WhatsApp Sent. ID:", data.id);
         res.json(data);
 
     } catch (error) {
-        console.error("❌ WhatsApp Request Failed:", error);
+        console.error("❌ YCloud Network Error:", error);
         res.status(500).json({ error: error.message });
     }
 });
