@@ -335,7 +335,8 @@ app.post('/api/notify', async (req, res) => {
 // --- YCLOUD WHATSAPP API ---
 app.post('/api/whatsapp/send', async (req, res) => {
     const { to, invoiceNumber, link, amount, buyerName, triggerType } = req.body;
-    const apiKey = process.env.YCLOUD_API_KEY; // Use env or fallback provided
+    amount = Number(amount.toString().replace(/[^0-9.]/g, ''));
+    const apiKey = process.env.YCLOUD_API_KEY ; // Use env or fallback provided
     const fromNumber = '+918310342294';
 
     if (!apiKey) {
