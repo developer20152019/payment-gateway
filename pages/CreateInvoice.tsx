@@ -86,7 +86,7 @@ const getInitialInvoice = (): InvoiceData => ({
 });
 
 const CreateInvoice: React.FC = () => {
-  const { id } = useParams();
+  const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   
   const [invoice, setInvoice] = useState<InvoiceData>(getInitialInvoice);
@@ -398,7 +398,10 @@ const CreateInvoice: React.FC = () => {
     if (docType === 'INVOICE' && !invoice.dueDate) missingFields.push("Due Date");
     if (!invoice.buyerName) missingFields.push("Client Name");
 
-    if (invoice.buyerEmail && !isValidEmail(invoice.buyerEmail)) {
+    // Require Email for Invoices to ensure sending works
+    if (docType === 'INVOICE' && !invoice.buyerEmail) {
+        missingFields.push("Client Email Address (Required for sending)");
+    } else if (invoice.buyerEmail && !isValidEmail(invoice.buyerEmail)) {
         missingFields.push("Valid Client Email Address");
     }
 
@@ -480,14 +483,14 @@ const CreateInvoice: React.FC = () => {
                 disabled={isSaving}
                 className="bg-white border border-gray-300 text-gray-700 px-4 py-2 rounded-lg font-medium text-sm hover:bg-gray-50 transition-colors flex items-center gap-2"
              >
-                Save as Quote
+                Send Quote
              </button>
              <button 
                 onClick={(e) => handleSubmit(e, 'INVOICE')}
                 disabled={isSaving}
                 className="bg-indigo-600 text-white px-5 py-2 rounded-lg font-medium text-sm hover:bg-indigo-700 transition-colors flex items-center gap-2 shadow-sm shadow-indigo-200"
              >
-                {isSaving ? 'Saving...' : 'Save & Send'}
+                {isSaving ? 'Saving...' : 'Send Invoice'}
              </button>
           </div>
         </div>
@@ -631,7 +634,16 @@ const CreateInvoice: React.FC = () => {
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <input type="email" placeholder="Email Address" className="border border-gray-300 rounded-lg p-2 text-sm outline-none focus:border-indigo-500" value={invoice.buyerEmail} onChange={(e) => handleChange('buyerEmail', e.target.value)} />
+                        <div className="relative">
+                            <input 
+                                type="email" 
+                                placeholder="Email Address" 
+                                className={`w-full border rounded-lg p-2 text-sm outline-none focus:border-indigo-500 ${!invoice.buyerEmail ? 'border-amber-300 bg-amber-50' : 'border-gray-300'}`}
+                                value={invoice.buyerEmail} 
+                                onChange={(e) => handleChange('buyerEmail', e.target.value)} 
+                            />
+                            {!invoice.buyerEmail && <span className="absolute right-2 top-2 text-[10px] text-amber-600 font-bold">Required</span>}
+                        </div>
                         <input type="tel" placeholder="Phone Number" className="border border-gray-300 rounded-lg p-2 text-sm outline-none focus:border-indigo-500" value={invoice.buyerPhone} onChange={(e) => handlePhoneChange('buyerPhone', e.target.value)} />
                         <div className="md:col-span-2">
                             <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Billing Address</label>

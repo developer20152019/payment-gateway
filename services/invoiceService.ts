@@ -262,6 +262,23 @@ export const InvoiceService = {
   sendEmailNotification: async (invoice: InvoiceData, type: 'CREATED' | 'PAID') => {
     try {
         const link = `${window.location.origin}${window.location.pathname}#/view/${invoice.id}`;
+        
+        // Basic HTML Body for standard notification
+        const htmlBody = `
+            <div style="font-family: Arial, sans-serif; color: #333;">
+                <p>Dear ${invoice.buyerName},</p>
+                <p>Please find the link to your ${invoice.type === 'QUOTATION' ? 'Quotation' : 'Invoice'} below:</p>
+                <p>
+                    <a href="${link}" style="background-color: #4f46e5; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; display: inline-block;">
+                        View Document
+                    </a>
+                </p>
+                <p style="font-size: 12px; color: #666;">Or copy this link: ${link}</p>
+                <br/>
+                <p>Regards,<br/>${invoice.businessName}</p>
+            </div>
+        `;
+
         await fetch(`${API_BASE}/notify`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -270,7 +287,7 @@ export const InvoiceService = {
                 subject: type === 'PAID' 
                     ? `Receipt for Invoice #${invoice.invoiceNumber}` 
                     : `${invoice.type === 'QUOTATION' ? 'Quotation' : 'Invoice'} #${invoice.invoiceNumber} from ${invoice.businessName}`,
-                body: `Please find the link to your ${invoice.type.toLowerCase()} below.`,
+                body: htmlBody, 
                 link: link,
                 type: type
             })

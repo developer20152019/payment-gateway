@@ -5,6 +5,7 @@ const cors = require('cors');
 const mysql = require('mysql2/promise');
 const crypto = require('crypto');
 const Razorpay = require('razorpay');
+const nodemailer = require('nodemailer');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -326,10 +327,43 @@ app.delete('/api/invoices/:id', async (req, res) => {
 
 // 5. NOTIFICATIONS (Email)
 app.post('/api/notify', async (req, res) => {
-    const { to, subject } = req.body;
-    console.log(`\n📧 Email Stub: Sending to ${to}: ${subject}`);
-    // Here you would integrate Nodemailer or SendGrid
-    res.json({ success: true });
+    const { to, subject, body, attachments } = req.body;
+
+    // Check if SMTP credentials exist
+    if (!process.env.SMTP_USER || !process.env.SMTP_PASS) {
+        console.log(`\n📧 Email Simulation (SMTP Missing):`);
+        console.log(`   To: ${to}`);
+        console.log(`   Subject: ${subject}`);
+        console.log(`   Attachments: ${attachments ? attachments.length : 0} file(s)`);
+        return res.json({ success: true, message: "Email simulated (Configure SMTP in .env to send real emails)" });
+    }
+
+    try {
+        const transporter = nodemailer.createTransport({
+            host: process.env.SMTP_HOST || 'smtp.gmail.com',
+            port: Number(process.env.SMTP_PORT) || 587,
+            secure: process.env.SMTP_SECURE === 'true', // true for 465, false for other ports
+            auth: {
+                user: process.env.SMTP_USER,
+                pass: process.env.SMTP_PASS
+            }
+        });
+
+        const info = await transporter.sendMail({
+            from: process.env.SMTP_FROM || `"PayLink" <${process.env.SMTP_USER}>`,
+            to: to,
+            subject: subject,
+            html: body, // Assume body is HTML
+            attachments: attachments // Pass attachments array directly (Nodemailer supports {filename, content, encoding})
+        });
+
+        console.log('✅ Email sent: %s', info.messageId);
+        res.json({ success: true, messageId: info.messageId });
+
+    } catch (error) {
+        console.error('❌ Email Failed:', error);
+        res.status(500).json({ error: "Failed to send email: " + error.message });
+    }
 });
 
 // --- YCLOUD WHATSAPP API ---

@@ -11,7 +11,7 @@ interface NotificationState {
 }
 
 const ViewInvoice: React.FC = () => {
-  const { id } = useParams();
+  const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const location = useLocation();
   
@@ -67,6 +67,11 @@ const ViewInvoice: React.FC = () => {
 
   // Reusable PDF E-mailing Function
   const generateAndSendPDF = useCallback(async (currentInvoice: InvoiceData, triggerType: 'CREATED' | 'PAID') => {
+    if (!currentInvoice.buyerEmail) {
+        showNotification("No client email found. Notification skipped.", 'warning');
+        return;
+    }
+
     setIsSendingEmail(true);
     showNotification(triggerType === 'PAID' ? "Processing Payment Receipt..." : "Sending Document...", 'info');
     
@@ -146,17 +151,19 @@ const ViewInvoice: React.FC = () => {
         
         if (data && mounted) {
             // Check if we navigated here with a request to auto-send email
-            if (location.state?.autoSendEmail) {
-                setTimeout(() => generateAndSendPDF(data, location.state.emailType || 'CREATED'), 500);
+            // In v6, state is unknown by default, check prop existence
+            const state = location.state as any;
+            if (state?.autoSendEmail) {
+                setTimeout(() => generateAndSendPDF(data, state.emailType || 'CREATED'), 500);
             }
             
             // Check if we should open share modal immediately (e.g. from creation)
-            if (location.state?.openShare) {
+            if (state?.openShare) {
                setTimeout(() => setShowShareModal(true), 800);
             }
 
             // Clear state so it doesn't fire on refresh
-            if (location.state?.autoSendEmail || location.state?.openShare) {
+            if (state?.autoSendEmail || state?.openShare) {
                 window.history.replaceState({}, document.title);
             }
         }
