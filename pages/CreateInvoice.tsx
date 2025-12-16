@@ -606,9 +606,9 @@ const CreateInvoice: React.FC = () => {
                             onFocus={() => setShowSuggestions(true)}
                         />
                         {/* Suggestions Dropdown */}
-                        {showSuggestions && invoice.buyerName && (
+                        {showSuggestions && (
                             <div className="absolute z-10 w-full bg-white border border-gray-200 mt-1 rounded-lg shadow-xl max-h-48 overflow-y-auto">
-                                {customers.filter(c => c.name.toLowerCase().includes(invoice.buyerName.toLowerCase())).map(c => (
+                                {customers.filter(c => c.name.toLowerCase().includes((invoice.buyerName || '').toLowerCase())).map(c => (
                                     <div 
                                         key={c.id} 
                                         className="px-4 py-2 hover:bg-gray-50 cursor-pointer text-sm"
@@ -618,8 +618,11 @@ const CreateInvoice: React.FC = () => {
                                         <div className="text-gray-500 text-xs">{c.email}</div>
                                     </div>
                                 ))}
-                                {customers.filter(c => c.name.toLowerCase().includes(invoice.buyerName.toLowerCase())).length === 0 && (
-                                    <div className="px-4 py-2 text-xs text-gray-400 italic">No existing clients found.</div>
+                                {customers.length > 0 && customers.filter(c => c.name.toLowerCase().includes((invoice.buyerName || '').toLowerCase())).length === 0 && (
+                                    <div className="px-4 py-2 text-xs text-gray-400 italic">No matching clients found.</div>
+                                )}
+                                {customers.length === 0 && (
+                                     <div className="px-4 py-2 text-xs text-gray-400 italic">No saved customers. Add one above.</div>
                                 )}
                             </div>
                         )}
