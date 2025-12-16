@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { InvoiceData, LineItem, PaymentStatus, Product, DocumentType, Customer } from '../types';
-import { PhotoIcon, PlusIcon, TrashIcon, DocumentTextIcon, ArrowPathIcon, ChevronLeftIcon, CheckCircleIcon, ChatBubbleLeftRightIcon, EyeIcon, UserPlusIcon, XMarkIcon, CalendarDaysIcon } from '@heroicons/react/24/outline';
+import { PhotoIcon, PlusIcon, TrashIcon, DocumentTextIcon, ArrowPathIcon, ChevronLeftIcon, CheckCircleIcon, ChatBubbleLeftRightIcon, EyeIcon, UserPlusIcon, XMarkIcon } from '@heroicons/react/24/outline';
 import { InvoiceService } from '../services/invoiceService';
 import { ProductService } from '../services/productService';
 import { CustomerService } from '../services/customerService';
@@ -515,35 +515,29 @@ const CreateInvoice: React.FC = () => {
                             </div>
                         </div>
                         <div className="grid grid-cols-2 gap-4">
-                            <div className="relative">
+                            <div>
                                 <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2 flex items-center gap-1">
                                     Date <span className="text-red-500">*</span>
                                 </label>
-                                <div className="relative">
-                                    <input 
-                                        type="date" 
-                                        required
-                                        className="w-full border border-gray-300 rounded-lg pl-3 pr-10 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none transition-shadow"
-                                        value={dateValue}
-                                        onChange={(e) => handleDateChange('date', e.target.value)}
-                                    />
-                                    <CalendarDaysIcon className="w-5 h-5 absolute right-3 top-2 text-gray-400 pointer-events-none" />
-                                </div>
+                                <input 
+                                    type="date" 
+                                    required
+                                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none transition-shadow"
+                                    value={dateValue}
+                                    onChange={(e) => handleDateChange('date', e.target.value)}
+                                />
                             </div>
-                            <div className="relative">
+                            <div>
                                 <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2 flex items-center gap-1">
                                     Due Date
                                 </label>
-                                <div className="relative">
-                                    <input 
-                                        type="date" 
-                                        min={dateValue}
-                                        className="w-full border border-gray-300 rounded-lg pl-3 pr-10 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none transition-shadow"
-                                        value={dueDateValue}
-                                        onChange={(e) => handleDateChange('dueDate', e.target.value)}
-                                    />
-                                    <CalendarDaysIcon className="w-5 h-5 absolute right-3 top-2 text-gray-400 pointer-events-none" />
-                                </div>
+                                <input 
+                                    type="date" 
+                                    min={dateValue}
+                                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none transition-shadow"
+                                    value={dueDateValue}
+                                    onChange={(e) => handleDateChange('dueDate', e.target.value)}
+                                />
                             </div>
                         </div>
                     </div>
