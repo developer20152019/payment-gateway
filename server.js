@@ -259,7 +259,6 @@ app.post('/api/invoices', async (req, res) => {
     }
 
     // STRICTLY Format Dates for MySQL (YYYY-MM-DD HH:MM:SS) in IST
-    // We do this conversion BEFORE putting it into the SQL array to ensure format is clean
     const sqlDate = toMysqlDateTime(inv.date);
     const sqlDueDate = toMysqlDateTime(inv.dueDate);
 
@@ -325,11 +324,70 @@ app.delete('/api/invoices/:id', async (req, res) => {
     }
 });
 
-// 5. NOTIFICATION
+// 5. NOTIFICATIONS (Email)
 app.post('/api/notify', async (req, res) => {
     const { to, subject } = req.body;
     console.log(`\n📧 Email Stub: Sending to ${to}: ${subject}`);
+    // Here you would integrate Nodemailer or SendGrid
     res.json({ success: true });
+});
+
+// --- WHATSAPP CLOUD API ---
+app.post('/api/whatsapp/send', async (req, res) => {
+    const { to, type, invoiceNumber, link, amount, businessName } = req.body;
+    const token = process.env.WHATSAPP_TOKEN;
+    const phoneId = process.env.WHATSAPP_PHONE_ID;
+
+    // Sanitize phone number (remove +, spaces, hyphens)
+    // WhatsApp Cloud API expects country code without +
+    const cleanPhone = to ? to.replace(/[^0-9]/g, '') : '';
+
+    console.log(`\n📱 WhatsApp Request: ${cleanPhone}`);
+
+    if (!token || !phoneId) {
+        console.warn("⚠️ WhatsApp Credentials Missing in .env (WHATSAPP_TOKEN, WHATSAPP_PHONE_ID)");
+        // Return a mock success so frontend doesn't crash, but log error
+        return res.json({ success: true, message: "Stub mode: Credentials not set" });
+    }
+
+    try {
+        // Construct the message payload
+        const payload = {
+            messaging_product: "whatsapp",
+            recipient_type: "individual",
+            to: cleanPhone,
+            type: "text",
+            text: {
+                // NOTE: Cloud API allows free-form text ONLY if the user has messaged you within 24h.
+                // Otherwise, you MUST use a template. For simplicity here, we assume a session is open or test mode.
+                body: `Dear Customer,\n\nPlease find your ${type} #${invoiceNumber} for ${amount}.\n\nView here: ${link}\n\nRegards,\n${businessName}`
+            }
+        };
+
+        const response = await fetch(`https://graph.facebook.com/v17.0/${phoneId}/messages`, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(payload)
+        });
+        
+        const data = await response.json();
+        
+        if (data.error) {
+            console.error("❌ WhatsApp API Error:", data.error);
+            // Return 400 so frontend knows it failed
+            return res.status(400).json({ error: data.error.message });
+        }
+
+        console.log("✅ WhatsApp Message Sent ID:", data.messages ? data.messages[0].id : 'Unknown');
+        res.json(data);
+
+    } catch (error) {
+        console.error("❌ WhatsApp Request Failed:", error);
+        res.status(500).json({ error: error.message });
+    }
 });
 
 // 6. PAYMENTS

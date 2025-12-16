@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { InvoiceData, PaymentStatus } from '../types';
 import { InvoicePreview } from '../components/InvoicePreview';
-import { ShieldCheckIcon, ShareIcon, PrinterIcon, ArrowDownTrayIcon, CheckCircleIcon, XCircleIcon, EnvelopeIcon, ChatBubbleLeftRightIcon, ClipboardIcon } from '@heroicons/react/24/outline';
+import { ShieldCheckIcon, ShareIcon, PrinterIcon, ArrowDownTrayIcon, CheckCircleIcon, XCircleIcon, EnvelopeIcon, ChatBubbleLeftRightIcon, ClipboardIcon, PaperAirplaneIcon } from '@heroicons/react/24/outline';
 import { InvoiceService } from '../services/invoiceService';
 
 interface NotificationState {
@@ -19,6 +19,7 @@ const ViewInvoice: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
   const [isSendingEmail, setIsSendingEmail] = useState(false);
+  const [isSendingWhatsApp, setIsSendingWhatsApp] = useState(false);
   const [notification, setNotification] = useState<NotificationState | null>(null);
   
   // Post-Generation Share Modal State
@@ -65,24 +66,48 @@ const ViewInvoice: React.FC = () => {
       }
   };
 
-  const handleWhatsAppShare = () => {
+  // 1. Manual Share (Opens Client App)
+  const handleWhatsAppShareApp = () => {
     if (!invoice || !invoice.buyerPhone) {
         showNotification("Client phone number missing.", "error");
         return;
     }
 
-    // Clean phone number
+    // Clean phone number: remove all non-digits
     let phone = invoice.buyerPhone.replace(/[^0-9]/g, '');
-    // Default to India if no country code (simple heuristic)
+    
+    // If it's a 10-digit number (common in India), append country code
     if (phone.length === 10) {
         phone = '91' + phone;
     }
 
     const url = window.location.href;
     const docType = invoice.type === 'QUOTATION' ? 'estimate' : 'invoice';
-    const text = `Dear ${invoice.buyerName},%0A%0AThank you for contacting us. Your ${docType} can be paid, viewed, printed and downloaded as PDF from the link below.%0A%0A${url}`;
+    const invoiceNum = invoice.paidInvoiceNumber || invoice.invoiceNumber;
+    
+    // Construct text
+    const text = `Dear ${invoice.buyerName},\n\nThank you for contacting us. Your ${docType} #${invoiceNum} can be paid, viewed, printed and downloaded as PDF from the link below.\n\n${url}`;
 
-    window.open(`https://wa.me/${phone}?text=${text}`, '_blank');
+    // Encode text component for URL
+    const encodedText = encodeURIComponent(text);
+
+    // Open WhatsApp API link
+    window.open(`https://api.whatsapp.com/send?phone=${phone}&text=${encodedText}`, '_blank');
+  };
+
+  // 2. API Send (Server-Side)
+  const handleWhatsAppSendApi = async () => {
+      if (!invoice) return;
+      setIsSendingWhatsApp(true);
+      try {
+          await InvoiceService.sendWhatsAppNotification(invoice);
+          showNotification("WhatsApp message sent via API!", "success");
+      } catch (error: any) {
+          console.error(error);
+          showNotification(error.message || "Failed to send via API", "error");
+      } finally {
+          setIsSendingWhatsApp(false);
+      }
   };
 
   // Reusable PDF E-mailing Function
@@ -422,12 +447,32 @@ const ViewInvoice: React.FC = () => {
                  </p>
                  
                  <div className="space-y-3">
+                    {/* Send via API */}
                     <button 
-                        onClick={handleWhatsAppShare}
-                        className="w-full py-3 bg-[#25D366] hover:bg-[#20bd5a] text-white font-bold rounded-xl flex items-center justify-center gap-2 shadow-lg shadow-green-200 transition-colors"
+                        onClick={handleWhatsAppSendApi}
+                        disabled={isSendingWhatsApp}
+                        className="w-full py-3 bg-[#25D366] hover:bg-[#20bd5a] text-white font-bold rounded-xl flex items-center justify-center gap-2 shadow-lg shadow-green-200 transition-colors disabled:opacity-50"
                     >
-                        <ChatBubbleLeftRightIcon className="w-6 h-6" />
-                        Share on WhatsApp
+                        {isSendingWhatsApp ? (
+                            <>
+                                <div className="w-5 h-5 border-2 border-white/40 border-t-white rounded-full animate-spin"></div>
+                                <span>Sending...</span>
+                            </>
+                        ) : (
+                            <>
+                                <PaperAirplaneIcon className="w-6 h-6 transform -rotate-45" />
+                                <span>Send via WhatsApp API</span>
+                            </>
+                        )}
+                    </button>
+
+                    {/* Share via App */}
+                    <button 
+                        onClick={handleWhatsAppShareApp}
+                        className="w-full py-3 bg-white border border-gray-200 text-gray-700 hover:bg-gray-50 font-bold rounded-xl flex items-center justify-center gap-2 transition-colors"
+                    >
+                        <ChatBubbleLeftRightIcon className="w-6 h-6 text-green-600" />
+                        Share via App (Manual)
                     </button>
                     
                     <button 

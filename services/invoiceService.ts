@@ -312,6 +312,31 @@ export const InvoiceService = {
     }
   },
 
+  sendWhatsAppNotification: async (invoice: InvoiceData): Promise<void> => {
+    const link = `${window.location.origin}${window.location.pathname}#/view/${invoice.id}`;
+    const docType = invoice.type === 'QUOTATION' ? 'Estimate' : 'Invoice';
+    const number = invoice.paidInvoiceNumber || invoice.invoiceNumber;
+    const amount = new Intl.NumberFormat('en-IN', { style: 'currency', currency: invoice.currency }).format(invoice.total);
+
+    const response = await fetch(`${API_BASE}/whatsapp/send`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            to: invoice.buyerPhone,
+            type: docType,
+            invoiceNumber: number,
+            link: link,
+            amount: amount,
+            businessName: invoice.businessName
+        })
+    });
+
+    if (!response.ok) {
+        const err = await response.json();
+        throw new Error(err.error || 'Failed to send WhatsApp message via API');
+    }
+  },
+
   // --- CCAvenue Initiation ---
   initiatePaymentSequence: async (invoice: InvoiceData): Promise<{ paymentHtml: string }> => {
     const API_URL = `${API_BASE}/payment/initiate`;
