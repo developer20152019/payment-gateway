@@ -55,6 +55,28 @@ async function generatePaidInvoiceNumber() {
     }
 }
 
+// --- Helper: Format ISO String to MySQL DATETIME in IST (India Standard Time) ---
+function toMysqlDateTime(isoString) {
+    if (!isoString) return null;
+    try {
+        const date = new Date(isoString);
+        if (isNaN(date.getTime())) return null;
+
+        // IST is UTC + 5:30
+        const istOffsetMs = (5 * 60 + 30) * 60 * 1000; 
+        const istDate = new Date(date.getTime() + istOffsetMs);
+
+        // toISOString returns UTC, but since we shifted the time manually by 5.5h,
+        // the "UTC" string output will actually match the IST wall clock time.
+        // We slice to remove 'T', 'Z' and milliseconds.
+        // Result format: "YYYY-MM-DD HH:MM:SS"
+        return istDate.toISOString().slice(0, 19).replace('T', ' ');
+    } catch (e) {
+        console.error("Date conversion error:", e);
+        return null;
+    }
+}
+
 // --- Payment Gateways Configuration ---
 
 const razorpay = new Razorpay({
@@ -221,6 +243,10 @@ app.post('/api/invoices', async (req, res) => {
         inv.paidInvoiceNumber = await generatePaidInvoiceNumber();
     }
 
+    // Format Dates for MySQL (YYYY-MM-DD HH:MM:SS) in IST
+    const sqlDate = toMysqlDateTime(inv.date);
+    const sqlDueDate = toMysqlDateTime(inv.dueDate);
+
     try {
         await connection.beginTransaction();
 
@@ -236,11 +262,11 @@ app.post('/api/invoices', async (req, res) => {
             ResourceSection=?, ResourceName=?, Subtotal=?, TaxRate=?, TaxAmount=?, Total=?, Currency=?, Status=?, PaymentGateway=?, Notes=?
         `, [
             // INSERT
-            inv.id, inv.invoiceNumber, inv.paidInvoiceNumber, inv.type, inv.date, inv.dueDate, inv.template, inv.brandColor, inv.logoUrl, inv.sellerName, inv.businessName, inv.sellerAddress,
+            inv.id, inv.invoiceNumber, inv.paidInvoiceNumber, inv.type, sqlDate, sqlDueDate, inv.template, inv.brandColor, inv.logoUrl, inv.sellerName, inv.businessName, inv.sellerAddress,
             inv.sellerGstin, inv.sellerEmail, inv.sellerPhone, inv.buyerName, inv.buyerContactPerson, inv.buyerEmail, inv.buyerPhone, inv.buyerAddress, inv.buyerShippingAddress, inv.placeOfSupply, inv.buyerPinCode,
             inv.resourceSection, inv.resourceName, inv.subtotal, inv.taxRate, inv.taxAmount, inv.total, inv.currency, inv.status, inv.paymentGateway, inv.notes,
             // UPDATE
-            inv.invoiceNumber, inv.paidInvoiceNumber, inv.type, inv.date, inv.dueDate, inv.template, inv.brandColor, inv.logoUrl, inv.sellerName, inv.businessName, inv.sellerAddress,
+            inv.invoiceNumber, inv.paidInvoiceNumber, inv.type, sqlDate, sqlDueDate, inv.template, inv.brandColor, inv.logoUrl, inv.sellerName, inv.businessName, inv.sellerAddress,
             inv.sellerGstin, inv.sellerEmail, inv.sellerPhone, inv.buyerName, inv.buyerContactPerson, inv.buyerEmail, inv.buyerPhone, inv.buyerAddress, inv.buyerShippingAddress, inv.placeOfSupply, inv.buyerPinCode,
             inv.resourceSection, inv.resourceName, inv.subtotal, inv.taxRate, inv.taxAmount, inv.total, inv.currency, inv.status, inv.paymentGateway, inv.notes
         ]);
