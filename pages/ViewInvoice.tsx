@@ -73,13 +73,14 @@ const ViewInvoice: React.FC = () => {
 
     // Clean phone number
     let phone = invoice.buyerPhone.replace(/[^0-9]/g, '');
+    // Default to India if no country code (simple heuristic)
     if (phone.length === 10) {
         phone = '91' + phone;
     }
 
     const url = window.location.href;
-    // Updated text format requested by user
-    const text = `Dear ${invoice.buyerName},%0A%0AThank you for contacting us. Your estimate can be paid, viewed, printed and downloaded as PDF from the link below.%0A%0A${url}`;
+    const docType = invoice.type === 'QUOTATION' ? 'estimate' : 'invoice';
+    const text = `Dear ${invoice.buyerName},%0A%0AThank you for contacting us. Your ${docType} can be paid, viewed, printed and downloaded as PDF from the link below.%0A%0A${url}`;
 
     window.open(`https://wa.me/${phone}?text=${text}`, '_blank');
   };
@@ -87,7 +88,7 @@ const ViewInvoice: React.FC = () => {
   // Reusable PDF E-mailing Function
   const generateAndSendPDF = useCallback(async (currentInvoice: InvoiceData, triggerType: 'CREATED' | 'PAID') => {
     setIsSendingEmail(true);
-    showNotification(triggerType === 'PAID' ? "Sending Payment Receipt..." : "Sending Invoice PDF...", 'info');
+    showNotification(triggerType === 'PAID' ? "Sending Payment Receipt..." : "Sending PDF...", 'info');
     
     // Slight delay to allow DOM to update (e.g. show PAID badge)
     await new Promise(resolve => setTimeout(resolve, 1000));

@@ -101,6 +101,62 @@ const LocalStorageService = {
   }
 };
 
+// Helper: Format Date DD/MM/YYYY
+const formatDateDDMMYYYY = (isoDate: string) => {
+    try {
+        const d = new Date(isoDate);
+        const day = String(d.getDate()).padStart(2, '0');
+        const month = String(d.getMonth() + 1).padStart(2, '0');
+        const year = d.getFullYear();
+        return `${day}/${month}/${year}`;
+    } catch {
+        return '';
+    }
+};
+
+// Helper: Generate HTML Email Body
+const generateEmailHtml = (invoice: InvoiceData, link: string) => {
+    const isQuote = invoice.type === 'QUOTATION';
+    const label = isQuote ? 'ESTIMATE' : 'INVOICE';
+    const number = invoice.paidInvoiceNumber || invoice.invoiceNumber;
+    const date = formatDateDDMMYYYY(invoice.date);
+    const amount = new Intl.NumberFormat('en-IN', { style: 'currency', currency: invoice.currency }).format(invoice.total);
+    
+    return `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; background-color: #ffffff; color: #333; padding-bottom: 20px;">
+        <div style="background-color: #fffbe6; padding: 40px 20px; text-align: center; border: 1px solid #f0f0f0; margin-bottom: 20px;">
+          <p style="margin: 0; font-size: 14px; font-weight: bold; color: #555; letter-spacing: 0.5px;">${label} AMOUNT</p>
+          <h1 style="margin: 15px 0 30px 0; font-size: 32px; color: #d9534f; font-weight: bold;">${amount}</h1>
+          
+          <div style="border-top: 1px solid #e6e1c5; margin: 20px auto; width: 80%;"></div>
+          
+          <table style="width: 100%; max-width: 320px; margin: 0 auto; text-align: left; font-size: 14px; border-collapse: collapse;">
+            <tr>
+              <td style="padding: 8px 0; color: #666;">${label === 'ESTIMATE' ? 'Estimate' : 'Invoice'} No</td>
+              <td style="padding: 8px 0; font-weight: bold; text-align: right; color: #333;">${number}</td>
+            </tr>
+            <tr>
+              <td style="padding: 8px 0; color: #666;">${label === 'ESTIMATE' ? 'Estimate' : 'Invoice'} Date</td>
+              <td style="padding: 8px 0; font-weight: bold; text-align: right; color: #333;">${date}</td>
+            </tr>
+          </table>
+  
+          <div style="margin-top: 40px;">
+            <a href="${link}" style="background-color: #5cb85c; color: white; padding: 14px 30px; text-decoration: none; font-weight: bold; font-size: 14px; display: inline-block; border-radius: 4px; box-shadow: 0 2px 5px rgba(0,0,0,0.1);">VIEW ${label}</a>
+          </div>
+        </div>
+        
+        <div style="padding: 0 20px; font-size: 13px; color: #888; line-height: 1.5;">
+          <p style="margin: 0 0 5px 0; font-weight: bold; color: #333;">Regards,</p>
+          <p style="margin: 0;">${invoice.sellerName}</p>
+          <p style="margin: 0;">${invoice.businessName}</p>
+          <p style="margin: 5px 0;">Mobile - ${invoice.sellerPhone}</p>
+          ${invoice.logoUrl ? `<div style="margin-top: 15px;"><img src="${invoice.logoUrl}" alt="Logo" style="height: 40px; display: block;"></div>` : ''}
+        </div>
+      </div>
+    `;
+};
+
 // --- Hybrid Service (API First -> Fallback to LS) ---
 export const InvoiceService = {
   
@@ -173,10 +229,6 @@ export const InvoiceService = {
             invoice.paymentGateway = gateway;
         }
         
-        // If we are marking as PAID (e.g. manual cash), we might want to let server generate the ID
-        // But the server endpoint handles ID generation on verification usually.
-        // If this is manual update via this service, pass it back.
-        
         // 2. Update backend
         const saveResponse = await fetch(`${API_BASE}/invoices`, {
           method: 'POST',
@@ -234,13 +286,15 @@ export const InvoiceService = {
     // Strip data URI prefix if present (e.g. "data:application/pdf;base64,")
     const base64Content = pdfBase64.includes(',') ? pdfBase64.split(',')[1] : pdfBase64;
 
+    const emailHtml = generateEmailHtml(invoice, link);
+
     const response = await fetch(`${API_BASE}/notify`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
             to: invoice.buyerEmail,
-            subject: `${invoice.type === 'QUOTATION' ? 'Quotation' : 'Invoice'} #${invoice.paidInvoiceNumber || invoice.invoiceNumber} from ${invoice.businessName}`,
-            body: `Please find the attached ${invoice.type.toLowerCase()} PDF.`,
+            subject: `${invoice.type === 'QUOTATION' ? 'Estimate' : 'Invoice'} #${invoice.paidInvoiceNumber || invoice.invoiceNumber} from ${invoice.businessName}`,
+            body: emailHtml, // Using the new HTML template
             link: link,
             type: 'MANUAL_PDF',
             attachments: [
