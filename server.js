@@ -379,8 +379,16 @@ app.post('/api/notify', async (req, res) => {
 
 // --- YCLOUD WHATSAPP API ---
 app.post('/api/whatsapp/send', async (req, res) => {
-    const { to, invoiceNumber, link, amount, buyerName, triggerType } = req.body;
-    amount = Number(amount.toString().replace(/[^0-9.]/g, ''));
+    // FIX: Use 'let' instead of 'const' to allow variable reassignment
+    let { to, invoiceNumber, link, amount, buyerName, triggerType } = req.body;
+    
+    // FIX: Safety check for amount before using .toString()
+    if (amount) {
+        amount = Number(amount.toString().replace(/[^0-9.]/g, ''));
+    } else {
+        amount = 0;
+    }
+
     const apiKey = process.env.YCLOUD_API_KEY ; // Use env or fallback provided
     const fromNumber = '+918310342294';
 
@@ -424,8 +432,8 @@ app.post('/api/whatsapp/send', async (req, res) => {
                         type: "body",
                         parameters: [
                             { type: "text", text: buyerName || "Customer" }, // Var 1
-                            { type: "text", text: amount },           // Var 2
-                            { type: "text", text: invoiceNumber }                   // Var 3
+                            { type: "text", text: amount.toString() },       // Var 2
+                            { type: "text", text: invoiceNumber }            // Var 3
                         ]
                     }
                 ]
@@ -446,7 +454,7 @@ app.post('/api/whatsapp/send', async (req, res) => {
                         parameters: [
                             { type: "text", text: buyerName || "Customer" }, // Var 1
                             { type: "text", text: invoiceNumber },           // Var 2 (Invoice/Estimate) - Note: Variable mapping here might need checking against template def
-                            { type: "text", text: amount },                  // Var 3
+                            { type: "text", text: amount.toString() },       // Var 3
                             { type: "text", text: link }                     // Var 4
                         ]
                     }
