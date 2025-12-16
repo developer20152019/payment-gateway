@@ -2,12 +2,12 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { InvoiceData, PaymentStatus } from '../types';
 import { InvoicePreview } from '../components/InvoicePreview';
-import { ShieldCheckIcon, ShareIcon, PrinterIcon, ArrowDownTrayIcon, CheckCircleIcon, XCircleIcon, EnvelopeIcon, ChatBubbleLeftRightIcon, ClipboardIcon, PaperAirplaneIcon } from '@heroicons/react/24/outline';
+import { ShieldCheckIcon, ShareIcon, PrinterIcon, ArrowDownTrayIcon, CheckCircleIcon, XCircleIcon, EnvelopeIcon, ChatBubbleLeftRightIcon, ClipboardIcon } from '@heroicons/react/24/outline';
 import { InvoiceService } from '../services/invoiceService';
 
 interface NotificationState {
   message: string;
-  type: 'success' | 'info' | 'error';
+  type: 'success' | 'info' | 'error' | 'warning';
 }
 
 const ViewInvoice: React.FC = () => {
@@ -19,14 +19,13 @@ const ViewInvoice: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
   const [isSendingEmail, setIsSendingEmail] = useState(false);
-  const [isSendingWhatsApp, setIsSendingWhatsApp] = useState(false);
   const [notification, setNotification] = useState<NotificationState | null>(null);
   
   // Post-Generation Share Modal State
   const [showShareModal, setShowShareModal] = useState(false);
 
   // Helper to show notifications
-  const showNotification = (msg: string, type: 'success' | 'info' | 'error' = 'info') => {
+  const showNotification = (msg: string, type: 'success' | 'info' | 'error' | 'warning' = 'info') => {
     setNotification({ message: msg, type });
     setTimeout(() => setNotification(null), 5000);
   };
@@ -95,25 +94,10 @@ const ViewInvoice: React.FC = () => {
     window.open(`https://api.whatsapp.com/send?phone=${phone}&text=${encodedText}`, '_blank');
   };
 
-  // 2. API Send (Server-Side)
-  const handleWhatsAppSendApi = async () => {
-      if (!invoice) return;
-      setIsSendingWhatsApp(true);
-      try {
-          await InvoiceService.sendWhatsAppNotification(invoice);
-          showNotification("WhatsApp message sent via API!", "success");
-      } catch (error: any) {
-          console.error(error);
-          showNotification(error.message || "Failed to send via API", "error");
-      } finally {
-          setIsSendingWhatsApp(false);
-      }
-  };
-
   // Reusable PDF E-mailing Function
   const generateAndSendPDF = useCallback(async (currentInvoice: InvoiceData, triggerType: 'CREATED' | 'PAID') => {
     setIsSendingEmail(true);
-    showNotification(triggerType === 'PAID' ? "Sending Payment Receipt..." : "Sending PDF...", 'info');
+    showNotification(triggerType === 'PAID' ? "Processing Payment Receipt..." : "Sending Document...", 'info');
     
     // Slight delay to allow DOM to update (e.g. show PAID badge)
     await new Promise(resolve => setTimeout(resolve, 1000));
@@ -135,16 +119,26 @@ const ViewInvoice: React.FC = () => {
 
     try {
         const pdfBase64 = await (window as any).html2pdf().from(element).set(opt).outputPdf('datauristring');
+        
+        // 1. Send Email (Backend sends email with attachment)
         await InvoiceService.sendPdfByEmail(currentInvoice, pdfBase64);
         
-        // Show share modal after email attempt (success or fail) if not already shown
+        // 2. Send WhatsApp Automatically (Backend sends template message)
+        showNotification("Email sent. Sending WhatsApp...", 'info');
+        try {
+            await InvoiceService.sendWhatsAppNotification(currentInvoice);
+            showNotification("Email and WhatsApp sent successfully!", 'success');
+        } catch (waError) {
+            console.error("WhatsApp Send Failed:", waError);
+            showNotification("Email sent, but WhatsApp failed.", 'warning');
+        }
+        
+        // Show share modal after email/whatsapp attempt
         setShowShareModal(true);
-        // We still show a small success toast in background
-        showNotification("Email sent successfully!", 'success');
 
     } catch (error: any) {
-        console.error("Email Error:", error);
-        showNotification("Failed to send email.", 'error');
+        console.error("Notification Error:", error);
+        showNotification("Failed to send notifications.", 'error');
         setShowShareModal(true);
     } finally {
         setIsSendingEmail(false);
@@ -416,11 +410,13 @@ const ViewInvoice: React.FC = () => {
       {notification && (
         <div className={`fixed top-6 left-1/2 -translate-x-1/2 z-[999] px-6 py-4 rounded-xl shadow-2xl flex flex-col md:flex-row items-center gap-4 animate-bounce-in ${
           notification.type === 'success' ? 'bg-green-600 text-white' : 
-          notification.type === 'error' ? 'bg-red-600 text-white' : 'bg-gray-800 text-white'
+          notification.type === 'error' ? 'bg-red-600 text-white' : 
+          notification.type === 'warning' ? 'bg-yellow-500 text-white' : 'bg-gray-800 text-white'
         }`}>
            <div className="flex items-center gap-3">
              {notification.type === 'success' && <CheckCircleIcon className="w-6 h-6"/>}
              {notification.type === 'error' && <XCircleIcon className="w-6 h-6"/>}
+             {notification.type === 'warning' && <ShieldCheckIcon className="w-6 h-6"/>}
              <span className="font-medium">{notification.message}</span>
            </div>
            
@@ -443,36 +439,18 @@ const ViewInvoice: React.FC = () => {
                     {invoice.type === 'QUOTATION' ? 'Quotation Sent!' : 'Invoice Sent!'}
                  </h3>
                  <p className="text-sm text-gray-600 mb-6">
-                    A PDF copy has been emailed to <strong>{invoice.buyerEmail}</strong>.
+                    A copy has been emailed to <strong>{invoice.buyerEmail}</strong>.<br/>
+                    WhatsApp notification was also attempted.
                  </p>
                  
                  <div className="space-y-3">
-                    {/* Send via API */}
-                    <button 
-                        onClick={handleWhatsAppSendApi}
-                        disabled={isSendingWhatsApp}
-                        className="w-full py-3 bg-[#25D366] hover:bg-[#20bd5a] text-white font-bold rounded-xl flex items-center justify-center gap-2 shadow-lg shadow-green-200 transition-colors disabled:opacity-50"
-                    >
-                        {isSendingWhatsApp ? (
-                            <>
-                                <div className="w-5 h-5 border-2 border-white/40 border-t-white rounded-full animate-spin"></div>
-                                <span>Sending...</span>
-                            </>
-                        ) : (
-                            <>
-                                <PaperAirplaneIcon className="w-6 h-6 transform -rotate-45" />
-                                <span>Send via WhatsApp API</span>
-                            </>
-                        )}
-                    </button>
-
-                    {/* Share via App */}
+                    {/* Share via App (Manual fallback) */}
                     <button 
                         onClick={handleWhatsAppShareApp}
-                        className="w-full py-3 bg-white border border-gray-200 text-gray-700 hover:bg-gray-50 font-bold rounded-xl flex items-center justify-center gap-2 transition-colors"
+                        className="w-full py-3 bg-[#25D366] hover:bg-[#20bd5a] text-white font-bold rounded-xl flex items-center justify-center gap-2 shadow-lg shadow-green-200 transition-colors"
                     >
-                        <ChatBubbleLeftRightIcon className="w-6 h-6 text-green-600" />
-                        Share via App (Manual)
+                        <ChatBubbleLeftRightIcon className="w-6 h-6" />
+                        Share Manually via WhatsApp
                     </button>
                     
                     <button 
@@ -498,7 +476,7 @@ const ViewInvoice: React.FC = () => {
           <div className="fixed inset-0 z-[1000] bg-black/20 backdrop-blur-[1px] flex items-end sm:items-top justify-center pt-20">
               <div className="bg-white rounded-full px-6 py-3 shadow-2xl flex items-center gap-3 animate-pulse">
                   <div className="w-4 h-4 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin"></div>
-                  <span className="font-medium text-indigo-900 text-sm">Generating PDF & Sending Email...</span>
+                  <span className="font-medium text-indigo-900 text-sm">Processing Notifications...</span>
               </div>
           </div>
       )}
@@ -512,8 +490,6 @@ const ViewInvoice: React.FC = () => {
           </div>
           <div className="flex gap-2 items-center">
              
-             {/* Button removed */}
-
              <button 
               onClick={handleDownloadPdf} 
               disabled={isDownloading}
