@@ -1,3 +1,4 @@
+
 require('dotenv').config();
 const express = require('express');
 const bodyParser = require('body-parser');
@@ -93,38 +94,23 @@ function toMysqlDateTime(isoString) {
     }
 }
 
-// --- Payment Gateways Configuration ---
-
-const razorpay = new Razorpay({
-    key_id: process.env.RAZORPAY_KEY_ID || 'rzp_test_placeholder',
-    key_secret: process.env.RAZORPAY_KEY_SECRET || 'secret_placeholder'
-});
-
-// CCAvenue Crypto Utils (AES-128-CBC)
-const ccav = {
-    encrypt: function (plainText, workingKey) {
-        const m = crypto.createHash('md5');
-        m.update(workingKey);
-        const key = m.digest(); // Buffer (16 bytes)
-        const iv = Buffer.from('\x00\x01\x02\x03\x04\x05\x06\x07\x08\x09\x0a\x0b\x0c\x0d\x0e\x0f', 'binary');
-        const cipher = crypto.createCipheriv('aes-128-cbc', key, iv);
-        let encoded = cipher.update(plainText, 'utf8', 'hex');
-        encoded += cipher.final('hex');
-        return encoded;
-    },
-    decrypt: function (encText, workingKey) {
-        const m = crypto.createHash('md5');
-        m.update(workingKey);
-        const key = m.digest(); // Buffer (16 bytes)
-        const iv = Buffer.from('\x00\x01\x02\x03\x04\x05\x06\x07\x08\x09\x0a\x0b\x0c\x0d\x0e\x0f', 'binary');
-        const decipher = crypto.createDecipheriv('aes-128-cbc', key, iv);
-        let decoded = decipher.update(encText, 'hex', 'utf8');
-        decoded += decipher.final('utf8');
-        return decoded;
-    }
-};
-
 // --- API Routes ---
+
+// 0. AUTHENTICATION
+app.post('/api/login', async (req, res) => {
+    const { email, password } = req.body;
+    try {
+        const [rows] = await pool.query('SELECT Email, Name FROM Users WHERE Email = ? AND Password = ?', [email, password]);
+        if (rows.length > 0) {
+            res.json({ success: true, user: rows[0] });
+        } else {
+            res.status(401).json({ success: false, error: 'Invalid email or password' });
+        }
+    } catch (err) {
+        console.error("Login Error:", err);
+        res.status(500).json({ error: err.message });
+    }
+});
 
 // 1. PRODUCTS
 app.get('/api/products', async (req, res) => {
@@ -179,7 +165,7 @@ app.post('/api/customers', async (req, res) => {
             INSERT INTO Customers (ID, Name, ContactPerson, Email, Phone, Address, ShippingAddress, Gstin, PlaceOfSupply, PinCode) 
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?) 
             ON DUPLICATE KEY UPDATE Name=?, ContactPerson=?, Email=?, Phone=?, Address=?, ShippingAddress=?, Gstin=?, PlaceOfSupply=?, PinCode=?
-        `, [id, name, contactPerson, email, phone, address, shippingAddress, gstin, placeOfSupply, pinCode, name, contactPerson, email, phone, address, shippingAddress, gstin, placeOfSupply, pinCode]);
+        `, [id, contactPerson, email, phone, address, shippingAddress, gstin, placeOfSupply, pinCode, name, contactPerson, email, phone, address, shippingAddress, gstin, placeOfSupply, pinCode]);
         res.json({ success: true });
     } catch (err) {
         res.status(500).json({ error: err.message });

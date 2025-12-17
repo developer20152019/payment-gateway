@@ -1,23 +1,29 @@
+
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { LockClosedIcon, DocumentTextIcon } from '@heroicons/react/24/outline';
+import { AuthService } from '../services/authService';
 
 const Login: React.FC = () => {
   const navigate = useNavigate();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    // Simple client-side auth for demonstration. 
-    // In a real app, verify against backend.
-    if (email === 'admin@paylink.com' && password === 'admin123') {
-        localStorage.setItem('isAuthenticated', 'true');
+    setError('');
+    setIsSubmitting(true);
+
+    const result = await AuthService.login(email, password);
+    
+    if (result.success) {
         navigate('/');
     } else {
-        setError('Invalid credentials.');
+        setError(result.error || 'Invalid credentials.');
     }
+    setIsSubmitting(false);
   };
 
   return (
@@ -80,9 +86,15 @@ const Login: React.FC = () => {
             <div>
               <button
                 type="submit"
-                className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 gap-2 items-center"
+                disabled={isSubmitting}
+                className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 gap-2 items-center disabled:opacity-50"
               >
-                <LockClosedIcon className="w-4 h-4" /> Sign in
+                {isSubmitting ? (
+                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                ) : (
+                    <LockClosedIcon className="w-4 h-4" />
+                )}
+                Sign in
               </button>
             </div>
           </form>
