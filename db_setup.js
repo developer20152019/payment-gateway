@@ -104,7 +104,9 @@ async function setupDatabase() {
                 Email VARCHAR(100),
                 Phone VARCHAR(50),
                 Address TEXT,
-                Gstin VARCHAR(50)
+                Gstin VARCHAR(50),
+                PlaceOfSupply VARCHAR(100),
+                PinCode VARCHAR(10)
             )
         `);
 
