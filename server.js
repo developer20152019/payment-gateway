@@ -77,6 +77,11 @@ function toMysqlDateTime(isoString) {
 
 // --- API Routes ---
 
+// Health Check
+app.get('/api/health', (req, res) => {
+    res.json({ status: 'ok', time: new Date().toISOString() });
+});
+
 // 0. AUTHENTICATION
 app.post('/api/login', async (req, res) => {
     const { email, password } = req.body;
@@ -89,7 +94,6 @@ app.post('/api/login', async (req, res) => {
         }
     } catch (err) {
         console.error("Login Error:", err);
-        // If DB table doesn't exist yet, provide a clear JSON error
         return res.status(500).json({ success: false, error: 'Database error: ' + err.message });
     }
 });
@@ -145,7 +149,7 @@ app.post('/api/customers', async (req, res) => {
             INSERT INTO Customers (ID, Name, ContactPerson, Email, Phone, Address, ShippingAddress, Gstin, PlaceOfSupply, PinCode) 
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?) 
             ON DUPLICATE KEY UPDATE Name=?, ContactPerson=?, Email=?, Phone=?, Address=?, ShippingAddress=?, Gstin=?, PlaceOfSupply=?, PinCode=?
-        `, [id, name, contactPerson, email, phone, address, shippingAddress, gstin, placeOfSupply, pinCode, name, contactPerson, email, phone, address, shippingAddress, gstin, placeOfSupply, pinCode]);
+        `, [id, contactPerson, email, phone, address, shippingAddress, gstin, placeOfSupply, pinCode, name, contactPerson, email, phone, address, shippingAddress, gstin, placeOfSupply, pinCode]);
         res.json({ success: true });
     } catch (err) {
         res.status(500).json({ error: err.message });
@@ -268,6 +272,6 @@ app.use('/api/*', (req, res) => {
     res.status(404).json({ error: `API route ${req.originalUrl} not found` });
 });
 
-app.listen(PORT, () => {
-    console.log(`Server running on http://localhost:${PORT}`);
+app.listen(PORT, '0.0.0.0', () => {
+    console.log(`✅ Backend server listening on 0.0.0.0:${PORT}`);
 });
