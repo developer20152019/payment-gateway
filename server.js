@@ -67,7 +67,7 @@ function toMysqlDateTime(isoString) {
 
 // --- API Routes ---
 
-// Gemini AI Summary
+// Gemini AI Summary (Used if needed in other pages, removed from ViewInvoice)
 app.post('/api/ai/summarize', async (req, res) => {
     const { invoiceData } = req.body;
     try {
@@ -116,16 +116,29 @@ app.post('/api/products', async (req, res) => {
     res.json({ success: true });
 });
 
-// Customers
+// Customers - FIXED: Included PlaceOfSupply and PinCode in SELECT and correctly mapped UPDATE
 app.get('/api/customers', async (req, res) => {
-    const [rows] = await pool.query('SELECT ID as id, Name as name, Email as email, Phone as phone, Address as address, Gstin as gstin FROM Customers');
+    const [rows] = await pool.query('SELECT ID as id, Name as name, Email as email, Phone as phone, Address as address, Gstin as gstin, PlaceOfSupply as placeOfSupply, PinCode as pinCode FROM Customers');
     res.json(rows);
 });
 
 app.post('/api/customers', async (req, res) => {
-    const { id, name, email, phone, address, gstin } = req.body;
-    await pool.query('INSERT INTO Customers (ID, Name, Email, Phone, Address, Gstin) VALUES (?, ?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE Name=?, Email=?, Phone=?, Address=?, Gstin=?', [id, name, email, phone, address, gstin, name, email, phone, address, gstin]);
-    res.json({ success: true });
+    const { id, name, email, phone, address, gstin, placeOfSupply, pinCode } = req.body;
+    try {
+        await pool.query(`
+            INSERT INTO Customers (ID, Name, Email, Phone, Address, Gstin, PlaceOfSupply, PinCode) 
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?) 
+            ON DUPLICATE KEY UPDATE 
+                Name=?, Email=?, Phone=?, Address=?, Gstin=?, PlaceOfSupply=?, PinCode=?
+        `, [
+            id, name, email, phone, address, gstin, placeOfSupply, pinCode, 
+            name, email, phone, address, gstin, placeOfSupply, pinCode
+        ]);
+        res.json({ success: true });
+    } catch (err) {
+        console.error('Customer Save Error:', err);
+        res.status(500).json({ error: err.message });
+    }
 });
 
 // Settings / Seller Profile
