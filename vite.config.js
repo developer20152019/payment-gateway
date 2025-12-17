@@ -7,12 +7,26 @@ export default defineConfig({
   server: {
     port: 5173,
     host: true, // Listen on all addresses (0.0.0.0) to allow access via IP
-    strictPort: true, // Ensure it uses exactly port 5173 or fails
+    strictPort: true, 
     proxy: {
       '/api': {
-        target: 'http://127.0.0.1:3000',
+        // Use localhost to allow system-level IPv4/IPv6 resolution
+        target: 'http://localhost:3000',
         changeOrigin: true,
-        secure: false
+        secure: false,
+        ws: true,
+        // Add logging to your terminal to debug proxy failures
+        configure: (proxy, _options) => {
+          proxy.on('error', (err, _req, _res) => {
+            console.log(' [Vite Proxy Error]:', err);
+          });
+          proxy.on('proxyReq', (proxyReq, req, _res) => {
+            console.log(' [Vite Proxy Request]:', req.method, req.url);
+          });
+          proxy.on('proxyRes', (proxyRes, req, _res) => {
+            console.log(' [Vite Proxy Response]:', proxyRes.statusCode, req.url);
+          });
+        },
       }
     }
   }

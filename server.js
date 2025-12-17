@@ -9,6 +9,7 @@ const Razorpay = require('razorpay');
 const nodemailer = require('nodemailer');
 
 const app = express();
+// Force port 3000 if not specified to match vite.config.js
 const PORT = process.env.PORT || 3000;
 
 // --- Middleware ---
@@ -34,11 +35,11 @@ const pool = mysql.createPool(dbConfig);
 (async () => {
     try {
         const connection = await pool.getConnection();
-        console.log('✅ Connected to MySQL Database');
+        console.log('✅ [DATABASE] Connected to MySQL');
         connection.release();
     } catch (err) {
-        console.error('❌ Database Connection Failed:', err.message);
-        console.log('   Note: Login will work with admin fallback if DB is offline.');
+        console.error('❌ [DATABASE] Connection Failed:', err.message);
+        console.log('   Note: Using admin fallback for login.');
     }
 })();
 
@@ -77,14 +78,15 @@ function toMysqlDateTime(isoString) {
 
 // --- API Routes ---
 
-// Health Check
+// Health Check (Very important for verifying proxy)
 app.get('/api/health', (req, res) => {
-    res.json({ status: 'ok', time: new Date().toISOString() });
+    res.json({ status: 'ok', serverTime: new Date().toISOString(), port: PORT });
 });
 
 // 0. AUTHENTICATION
 app.post('/api/login', async (req, res) => {
     const { email, password } = req.body;
+    console.log(`[AUTH] Login attempt for: ${email}`);
     try {
         const [rows] = await pool.query('SELECT Email, Name FROM Users WHERE Email = ? AND Password = ?', [email, password]);
         if (rows.length > 0) {
@@ -93,7 +95,7 @@ app.post('/api/login', async (req, res) => {
             return res.status(401).json({ success: false, error: 'Invalid email or password' });
         }
     } catch (err) {
-        console.error("Login Error:", err);
+        console.error("[AUTH] Database Error:", err);
         return res.status(500).json({ success: false, error: 'Database error: ' + err.message });
     }
 });
@@ -269,9 +271,18 @@ app.delete('/api/invoices/:id', async (req, res) => {
 
 // Final catch-all for /api routes to ensure JSON is returned for 404s
 app.use('/api/*', (req, res) => {
+    console.log(`[404] No route matched for: ${req.method} ${req.originalUrl}`);
     res.status(404).json({ error: `API route ${req.originalUrl} not found` });
 });
 
-app.listen(PORT, '0.0.0.0', () => {
-    console.log(`✅ Backend server listening on 0.0.0.0:${PORT}`);
+// Start Server
+const server = app.listen(PORT, '0.0.0.0', () => {
+    console.log(`🚀 [SERVER] Backend running at http://localhost:${PORT}`);
+    console.log(`   [SERVER] API listening at http://localhost:${PORT}/api`);
+});
+
+server.on('error', (e) => {
+    if (e.code === 'EADDRINUSE') {
+        console.error(`❌ [SERVER] Port ${PORT} is already in use. Please close other instances.`);
+    }
 });
