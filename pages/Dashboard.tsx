@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { InvoiceData, PaymentStatus, DocumentType } from '../types';
 import { InvoiceService } from '../services/invoiceService';
-import { PlusIcon, DocumentTextIcon, TrashIcon, MagnifyingGlassIcon, LinkIcon, CheckIcon, XMarkIcon, ArrowUpIcon, ArrowDownIcon, BanknotesIcon, PencilIcon, TagIcon, ClipboardDocumentListIcon, UsersIcon, Cog6ToothIcon, MapPinIcon, ArrowRightOnRectangleIcon, CalendarIcon } from '@heroicons/react/24/outline';
+import { PlusIcon, DocumentTextIcon, TrashIcon, MagnifyingGlassIcon, LinkIcon, CheckIcon, XMarkIcon, ArrowUpIcon, ArrowDownIcon, BanknotesIcon, PencilIcon, TagIcon, ClipboardDocumentListIcon, UsersIcon, Cog6ToothIcon, MapPinIcon, ArrowRightOnRectangleIcon, CalendarIcon, ClockIcon, ChevronDownIcon } from '@heroicons/react/24/outline';
 
 const INDIAN_STATES = [
   "Andhra Pradesh", "Arunachal Pradesh", "Assam", "Bihar", "Chhattisgarh", "Goa", "Gujarat", "Haryana", 
@@ -17,7 +17,6 @@ const formatDateToIST = (dateString: string) => {
   if (!dateString) return '-';
   try {
     const date = new Date(dateString);
-    // Check if date is valid
     if (isNaN(date.getTime())) return dateString;
     
     return date.toLocaleString('en-IN', {
@@ -150,7 +149,6 @@ const Dashboard: React.FC = () => {
 
     try {
         await InvoiceService.updateStatus(id, PaymentStatus.PAID, 'CASH');
-        // Reload to get the generated ID
         loadInvoices();
     } catch (error) {
         console.error("Failed to update status:", error);
@@ -168,13 +166,13 @@ const Dashboard: React.FC = () => {
 
   const getStatusBadge = (status: PaymentStatus) => {
     const styles = {
-      [PaymentStatus.PAID]: 'bg-green-100 text-green-800',
-      [PaymentStatus.PENDING]: 'bg-amber-100 text-amber-800',
-      [PaymentStatus.OVERDUE]: 'bg-red-100 text-red-800',
-      [PaymentStatus.FAILED]: 'bg-gray-100 text-gray-800',
+      [PaymentStatus.PAID]: 'bg-green-100 text-green-700 border border-green-200',
+      [PaymentStatus.PENDING]: 'bg-amber-50 text-amber-700 border border-amber-200',
+      [PaymentStatus.OVERDUE]: 'bg-red-50 text-red-700 border border-red-200',
+      [PaymentStatus.FAILED]: 'bg-gray-100 text-gray-600 border border-gray-200',
     };
     return (
-      <span className={`px-2 py-1 rounded-full text-xs font-bold ${styles[status]}`}>
+      <span className={`px-2.5 py-0.5 rounded-full text-[11px] font-bold uppercase tracking-wide ${styles[status]}`}>
         {status}
       </span>
     );
@@ -216,7 +214,6 @@ const Dashboard: React.FC = () => {
     const matchesType = typeFilter === 'ALL' || invoice.type === typeFilter;
     const matchesPlaceOfSupply = placeOfSupplyFilter === 'ALL' || (invoice.placeOfSupply && invoice.placeOfSupply === placeOfSupplyFilter);
 
-    // Resource Filter
     const matchesResourceSection = !resourceSectionFilter || (invoice.resourceSection || '').toLowerCase().includes(resourceSectionFilter.toLowerCase());
     const matchesResourceName = !resourceNameFilter || (invoice.resourceName || '').toLowerCase().includes(resourceNameFilter.toLowerCase());
 
@@ -230,7 +227,6 @@ const Dashboard: React.FC = () => {
     let matchesEnd = true;
     if (dateRange.end) {
         const endDate = new Date(dateRange.end);
-        // Set end date to end of day
         endDate.setHours(23, 59, 59, 999);
         matchesEnd = invoiceDate <= endDate;
     }
@@ -261,42 +257,45 @@ const Dashboard: React.FC = () => {
   const hasActiveFilters = searchQuery || statusFilter !== 'ALL' || typeFilter !== 'ALL' || placeOfSupplyFilter !== 'ALL' || dateRange.start || dateRange.end || resourceSectionFilter || resourceNameFilter;
 
   return (
-    <div className="min-h-screen bg-gray-50 pb-12">
+    <div className="min-h-screen bg-gray-50/50 pb-12 font-sans text-gray-900">
       {/* Navbar */}
-      <nav className="bg-white border-b border-gray-200 px-4 md:px-6 py-4">
-        <div className="max-w-6xl mx-auto flex justify-between items-center">
+      <nav className="bg-white border-b border-gray-200 px-4 md:px-6 py-4 sticky top-0 z-20 shadow-sm bg-opacity-90 backdrop-blur-sm">
+        <div className="max-w-7xl mx-auto flex justify-between items-center">
           <div className="font-bold text-xl text-indigo-600 flex items-center gap-2">
-            <DocumentTextIcon className="w-6 h-6" /> PayLink
+            <div className="w-8 h-8 bg-indigo-600 text-white rounded-lg flex items-center justify-center">
+                <DocumentTextIcon className="w-5 h-5" />
+            </div>
+            <span className="text-gray-900">PayLink</span>
           </div>
           <div className="flex gap-2 sm:gap-3">
             <button
                 onClick={() => navigate('/settings')}
-                className="text-gray-500 hover:text-gray-800 p-2 rounded-lg hover:bg-gray-50 transition-colors"
+                className="text-gray-500 hover:text-gray-800 p-2 rounded-lg hover:bg-gray-100 transition-colors"
                 title="Settings"
             >
                 <Cog6ToothIcon className="w-6 h-6" />
             </button>
             <button
                 onClick={() => navigate('/customers')}
-                className="bg-white text-gray-700 border border-gray-300 px-3 py-2 rounded-lg font-medium text-sm flex items-center gap-2 hover:bg-gray-50 transition-colors"
+                className="hidden md:flex bg-white text-gray-700 border border-gray-200 px-4 py-2 rounded-lg font-medium text-sm items-center gap-2 hover:bg-gray-50 transition-colors shadow-sm"
             >
-                <UsersIcon className="w-4 h-4" /> <span className="hidden sm:inline">Customers</span>
+                <UsersIcon className="w-4 h-4" /> Customers
             </button>
             <button
                 onClick={() => navigate('/products')}
-                className="bg-white text-gray-700 border border-gray-300 px-3 py-2 rounded-lg font-medium text-sm flex items-center gap-2 hover:bg-gray-50 transition-colors"
+                className="hidden md:flex bg-white text-gray-700 border border-gray-200 px-4 py-2 rounded-lg font-medium text-sm items-center gap-2 hover:bg-gray-50 transition-colors shadow-sm"
             >
-                <TagIcon className="w-4 h-4" /> <span className="hidden sm:inline">Products</span>
+                <TagIcon className="w-4 h-4" /> Products
             </button>
             <button
                 onClick={() => navigate('/create')}
-                className="bg-indigo-600 text-white px-4 py-2 rounded-lg font-medium text-sm flex items-center gap-2 hover:bg-indigo-700 transition-colors"
+                className="bg-indigo-600 text-white px-4 py-2 rounded-lg font-medium text-sm flex items-center gap-2 hover:bg-indigo-700 transition-colors shadow-md shadow-indigo-100"
             >
-                <PlusIcon className="w-4 h-4" /> <span className="hidden sm:inline">New Document</span>
+                <PlusIcon className="w-4 h-4" /> <span className="hidden sm:inline">New Invoice</span>
             </button>
             <button
                 onClick={handleLogout}
-                className="text-red-500 hover:text-red-700 p-2 rounded-lg hover:bg-red-50 transition-colors"
+                className="text-gray-400 hover:text-red-600 p-2 rounded-lg hover:bg-red-50 transition-colors"
                 title="Logout"
             >
                 <ArrowRightOnRectangleIcon className="w-6 h-6" />
@@ -305,91 +304,83 @@ const Dashboard: React.FC = () => {
         </div>
       </nav>
 
-      <div className="max-w-6xl mx-auto px-4 mt-8">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-8">
         {/* Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
-          <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
-             <p className="text-sm text-gray-500 font-medium">Total Revenue (Invoices)</p>
-             <p className="text-2xl font-bold text-gray-900 mt-1">
-               {new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR' }).format(totalRevenue)}
-             </p>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+          <div className="relative overflow-hidden bg-white p-6 rounded-2xl shadow-[0_2px_10px_-3px_rgba(6,81,237,0.1)] border border-gray-100 group hover:border-indigo-100 transition-all">
+             <div className="flex justify-between items-start">
+                <div>
+                    <p className="text-sm font-medium text-gray-500 mb-1">Total Revenue</p>
+                    <p className="text-3xl font-bold text-gray-900 tracking-tight">
+                        {new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR' }).format(totalRevenue)}
+                    </p>
+                </div>
+                <div className="p-3 bg-indigo-50 rounded-2xl group-hover:bg-indigo-100 transition-colors">
+                    <BanknotesIcon className="w-6 h-6 text-indigo-600" />
+                </div>
+             </div>
+             <div className="mt-4 flex items-center text-sm text-green-600 font-medium">
+                <ArrowUpIcon className="w-4 h-4 mr-1" />
+                <span>Paid Invoices</span>
+             </div>
           </div>
-          <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
-             <p className="text-sm text-gray-500 font-medium">Pending Payments (Invoices)</p>
-             <p className="text-2xl font-bold text-amber-600 mt-1">
-               {new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR' }).format(pendingAmount)}
-             </p>
+          <div className="relative overflow-hidden bg-white p-6 rounded-2xl shadow-[0_2px_10px_-3px_rgba(6,81,237,0.1)] border border-gray-100 group hover:border-amber-100 transition-all">
+             <div className="flex justify-between items-start">
+                <div>
+                    <p className="text-sm font-medium text-gray-500 mb-1">Pending Payments</p>
+                    <p className="text-3xl font-bold text-gray-900 tracking-tight">
+                        {new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR' }).format(pendingAmount)}
+                    </p>
+                </div>
+                <div className="p-3 bg-amber-50 rounded-2xl group-hover:bg-amber-100 transition-colors">
+                    <ClockIcon className="w-6 h-6 text-amber-600" />
+                </div>
+             </div>
+             <div className="mt-4 flex items-center text-sm text-amber-600 font-medium">
+                <span>Awaiting Payment</span>
+             </div>
           </div>
         </div>
 
-        {/* Invoice List Container */}
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+        {/* Filters & Content */}
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden flex flex-col">
           
-          {/* --- NEW FILTER SECTION --- */}
-          <div className="border-b border-gray-200 bg-white p-5">
-             <div className="flex justify-between items-center mb-6">
+          <div className="p-5 border-b border-gray-100">
+             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
                 <div className="flex items-center gap-3">
-                    <h2 className="font-bold text-gray-900 text-lg">Documents</h2>
-                    <span className="bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full text-xs font-semibold">{sortedInvoices.length}</span>
+                    <h2 className="text-lg font-bold text-gray-900">Transactions</h2>
+                    <span className="bg-gray-100 text-gray-600 py-0.5 px-2.5 rounded-full text-xs font-bold">{sortedInvoices.length}</span>
                 </div>
+                
                 {hasActiveFilters && (
-                    <button onClick={clearFilters} className="text-sm text-red-600 hover:text-red-800 font-medium flex items-center gap-1">
-                        <XMarkIcon className="w-4 h-4" /> Clear Filters
+                    <button 
+                        onClick={clearFilters} 
+                        className="text-sm font-medium text-red-600 hover:text-red-800 hover:bg-red-50 px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1.5 self-start sm:self-auto"
+                    >
+                        <XMarkIcon className="w-4 h-4" /> Reset Filters
                     </button>
                 )}
              </div>
 
              <div className="flex flex-col gap-4">
-                 {/* Row 1: Search & Date Range */}
-                 <div className="grid grid-cols-1 md:grid-cols-12 gap-4">
+                 {/* Row 1: Primary Filters */}
+                 <div className="grid grid-cols-1 md:grid-cols-12 gap-3">
                     {/* Search */}
-                    <div className="md:col-span-6 lg:col-span-5 relative">
-                        <label className="block text-[10px] uppercase font-bold text-gray-400 mb-1 tracking-wide">Search</label>
-                        <div className="relative">
-                            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                                <MagnifyingGlassIcon className="h-4 w-4 text-gray-400" />
-                            </div>
-                            <input
-                                type="text"
-                                placeholder="Client, email, invoice #..."
-                                className="block w-full pl-9 pr-3 py-2 border border-gray-200 rounded-lg text-sm bg-gray-50 focus:bg-white focus:ring-2 focus:ring-indigo-100 focus:border-indigo-500 outline-none transition-all"
-                                value={searchQuery}
-                                onChange={(e) => setSearchQuery(e.target.value)}
-                            />
-                        </div>
+                    <div className="md:col-span-4 relative group">
+                        <MagnifyingGlassIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 group-focus-within:text-indigo-500 transition-colors" />
+                        <input
+                            type="text"
+                            placeholder="Search clients, invoice #..."
+                            className="block w-full pl-10 pr-3 py-2.5 border border-gray-200 rounded-xl text-sm bg-gray-50 focus:bg-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all placeholder:text-gray-400"
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                        />
                     </div>
 
-                    {/* Date Range */}
-                    <div className="md:col-span-6 lg:col-span-4">
-                        <label className="block text-[10px] uppercase font-bold text-gray-400 mb-1 tracking-wide">Date Range</label>
-                        <div className="flex items-center gap-2">
-                            <div className="relative flex-1">
-                                <input
-                                    type="date"
-                                    className="block w-full px-3 py-2 border border-gray-200 rounded-lg text-sm bg-gray-50 focus:bg-white focus:ring-2 focus:ring-indigo-100 focus:border-indigo-500 outline-none transition-all text-gray-600"
-                                    value={dateRange.start}
-                                    onChange={(e) => setDateRange({ ...dateRange, start: e.target.value })}
-                                />
-                            </div>
-                            <span className="text-gray-400 text-sm font-medium">to</span>
-                            <div className="relative flex-1">
-                                <input
-                                    type="date"
-                                    className="block w-full px-3 py-2 border border-gray-200 rounded-lg text-sm bg-gray-50 focus:bg-white focus:ring-2 focus:ring-indigo-100 focus:border-indigo-500 outline-none transition-all text-gray-600"
-                                    value={dateRange.end}
-                                    onChange={(e) => setDateRange({ ...dateRange, end: e.target.value })}
-                                />
-                            </div>
-                        </div>
-                    </div>
-                 </div>
-
-                 {/* Row 2: Secondary Filters */}
-                 <div className="grid grid-cols-2 md:grid-cols-5 gap-4 pt-2">
-                    <div className="col-span-1">
-                        <label className="block text-[10px] uppercase font-bold text-gray-400 mb-1 tracking-wide">Status</label>
+                    {/* Status */}
+                    <div className="md:col-span-2 relative">
                         <select
-                            className="block w-full px-3 py-2 border border-gray-200 rounded-lg text-sm bg-gray-50 focus:bg-white focus:ring-2 focus:ring-indigo-100 focus:border-indigo-500 outline-none cursor-pointer"
+                            className="block w-full pl-3 pr-8 py-2.5 border border-gray-200 rounded-xl text-sm bg-gray-50 focus:bg-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all appearance-none cursor-pointer text-gray-700"
                             value={statusFilter}
                             onChange={(e) => setStatusFilter(e.target.value)}
                         >
@@ -399,50 +390,73 @@ const Dashboard: React.FC = () => {
                             <option value={PaymentStatus.OVERDUE}>Overdue</option>
                             <option value={PaymentStatus.FAILED}>Failed</option>
                         </select>
+                        <ChevronDownIcon className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
                     </div>
 
-                    <div className="col-span-1">
-                        <label className="block text-[10px] uppercase font-bold text-gray-400 mb-1 tracking-wide">Type</label>
+                    {/* Date Range */}
+                    <div className="md:col-span-4 flex items-center gap-2 bg-gray-50 border border-gray-200 rounded-xl px-3 py-2 focus-within:ring-2 focus-within:ring-indigo-500/20 focus-within:border-indigo-500 focus-within:bg-white transition-all">
+                        <CalendarIcon className="w-5 h-5 text-gray-400 shrink-0" />
+                        <input
+                            type="date"
+                            className="block w-full bg-transparent border-none p-0 text-sm text-gray-700 focus:ring-0 outline-none cursor-pointer"
+                            value={dateRange.start}
+                            onChange={(e) => setDateRange({ ...dateRange, start: e.target.value })}
+                            title="Start Date"
+                        />
+                        <span className="text-gray-300">|</span>
+                        <input
+                            type="date"
+                            className="block w-full bg-transparent border-none p-0 text-sm text-gray-700 focus:ring-0 outline-none cursor-pointer"
+                            value={dateRange.end}
+                            onChange={(e) => setDateRange({ ...dateRange, end: e.target.value })}
+                            title="End Date"
+                        />
+                    </div>
+
+                    {/* Type */}
+                    <div className="md:col-span-2 relative">
                         <select
-                            className="block w-full px-3 py-2 border border-gray-200 rounded-lg text-sm bg-gray-50 focus:bg-white focus:ring-2 focus:ring-indigo-100 focus:border-indigo-500 outline-none cursor-pointer"
+                            className="block w-full pl-3 pr-8 py-2.5 border border-gray-200 rounded-xl text-sm bg-gray-50 focus:bg-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all appearance-none cursor-pointer text-gray-700"
                             value={typeFilter}
                             onChange={(e) => setTypeFilter(e.target.value)}
                         >
                             <option value="ALL">All Types</option>
-                            <option value="INVOICE">Invoice</option>
-                            <option value="QUOTATION">Quote</option>
+                            <option value="INVOICE">Invoices</option>
+                            <option value="QUOTATION">Quotes</option>
                         </select>
+                        <ChevronDownIcon className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
                     </div>
+                 </div>
 
-                    <div className="col-span-2 md:col-span-1">
-                        <label className="block text-[10px] uppercase font-bold text-gray-400 mb-1 tracking-wide">State</label>
+                 {/* Row 2: Secondary Filters (Lighter Styling) */}
+                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <div className="relative">
+                        <MapPinIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
                         <select
-                            className="block w-full px-3 py-2 border border-gray-200 rounded-lg text-sm bg-gray-50 focus:bg-white focus:ring-2 focus:ring-indigo-100 focus:border-indigo-500 outline-none cursor-pointer truncate"
+                            className="block w-full pl-9 pr-8 py-2 border border-gray-200 rounded-lg text-xs bg-white text-gray-600 outline-none focus:border-indigo-500 transition-all appearance-none hover:bg-gray-50 cursor-pointer"
                             value={placeOfSupplyFilter}
                             onChange={(e) => setPlaceOfSupplyFilter(e.target.value)}
                         >
-                            <option value="ALL">All States</option>
+                            <option value="ALL">Filter by State</option>
                             {INDIAN_STATES.map(s => <option key={s} value={s}>{s}</option>)}
                         </select>
                     </div>
-
-                    <div className="col-span-1">
-                        <label className="block text-[10px] uppercase font-bold text-gray-400 mb-1 tracking-wide">Res. Section</label>
+                    <div className="relative">
+                        <ClipboardDocumentListIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
                         <input
                             type="text"
-                            placeholder="All"
-                            className="block w-full px-3 py-2 border border-gray-200 rounded-lg text-sm bg-gray-50 focus:bg-white focus:ring-2 focus:ring-indigo-100 focus:border-indigo-500 outline-none"
+                            placeholder="Resource Section"
+                            className="block w-full pl-9 pr-3 py-2 border border-gray-200 rounded-lg text-xs bg-white text-gray-600 placeholder-gray-400 outline-none focus:border-indigo-500 transition-all hover:bg-gray-50"
                             value={resourceSectionFilter}
                             onChange={(e) => setResourceSectionFilter(e.target.value)}
                         />
                     </div>
-
-                    <div className="col-span-1">
-                        <label className="block text-[10px] uppercase font-bold text-gray-400 mb-1 tracking-wide">Res. Name</label>
+                    <div className="relative">
+                        <TagIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
                         <input
                             type="text"
-                            placeholder="All"
-                            className="block w-full px-3 py-2 border border-gray-200 rounded-lg text-sm bg-gray-50 focus:bg-white focus:ring-2 focus:ring-indigo-100 focus:border-indigo-500 outline-none"
+                            placeholder="Resource Name"
+                            className="block w-full pl-9 pr-3 py-2 border border-gray-200 rounded-lg text-xs bg-white text-gray-600 placeholder-gray-400 outline-none focus:border-indigo-500 transition-all hover:bg-gray-50"
                             value={resourceNameFilter}
                             onChange={(e) => setResourceNameFilter(e.target.value)}
                         />
@@ -453,30 +467,30 @@ const Dashboard: React.FC = () => {
 
           <div className="overflow-x-auto overflow-y-auto max-h-[500px]">
                 <table className="w-full text-left border-collapse">
-                   <thead className="bg-gray-50 text-xs uppercase font-medium text-gray-500 border-b border-gray-200 sticky top-0 z-10">
+                   <thead className="bg-gray-50 text-xs uppercase font-semibold text-gray-500 border-b border-gray-200 sticky top-0 z-10">
                       <tr>
-                         <th className="px-6 py-4 bg-gray-50">Reference</th>
-                         <th className="px-6 py-4 bg-gray-50">Invoice #</th>
-                         <th className="px-6 py-4 bg-gray-50">Client</th>
-                         <th className="px-6 py-4 cursor-pointer hover:text-gray-700 bg-gray-50" onClick={() => handleSort('date')}>
+                         <th className="px-6 py-4 bg-gray-50/95 backdrop-blur">Ref #</th>
+                         <th className="px-6 py-4 bg-gray-50/95 backdrop-blur">Inv #</th>
+                         <th className="px-6 py-4 bg-gray-50/95 backdrop-blur">Client</th>
+                         <th className="px-6 py-4 cursor-pointer hover:text-gray-700 bg-gray-50/95 backdrop-blur" onClick={() => handleSort('date')}>
                             <div className="flex items-center gap-1">Date {sortConfig.key === 'date' && (sortConfig.direction === 'asc' ? <ArrowUpIcon className="w-3 h-3"/> : <ArrowDownIcon className="w-3 h-3"/>)}</div>
                          </th>
-                         <th className="px-6 py-4 cursor-pointer hover:text-gray-700 text-right bg-gray-50" onClick={() => handleSort('amount')}>
+                         <th className="px-6 py-4 cursor-pointer hover:text-gray-700 text-right bg-gray-50/95 backdrop-blur" onClick={() => handleSort('amount')}>
                             <div className="flex items-center justify-end gap-1">Amount {sortConfig.key === 'amount' && (sortConfig.direction === 'asc' ? <ArrowUpIcon className="w-3 h-3"/> : <ArrowDownIcon className="w-3 h-3"/>)}</div>
                          </th>
-                         <th className="px-6 py-4 text-center bg-gray-50">Status</th>
-                         <th className="px-6 py-4 text-right bg-gray-50">Actions</th>
+                         <th className="px-6 py-4 text-center bg-gray-50/95 backdrop-blur">Status</th>
+                         <th className="px-6 py-4 text-right bg-gray-50/95 backdrop-blur">Actions</th>
                       </tr>
                    </thead>
-                   <tbody className="divide-y divide-gray-100 text-sm">
+                   <tbody className="divide-y divide-gray-100 text-sm bg-white">
                       {isLoading ? (
                           <tr>
-                              <td colSpan={7} className="px-6 py-8 text-center text-gray-500">Loading...</td>
+                              <td colSpan={7} className="px-6 py-12 text-center text-gray-500">Loading documents...</td>
                           </tr>
                       ) : sortedInvoices.length === 0 ? (
                           <tr>
                               <td colSpan={7} className="px-6 py-12 text-center text-gray-500 flex flex-col items-center justify-center">
-                                  <DocumentTextIcon className="w-12 h-12 text-gray-300 mb-2" />
+                                  <DocumentTextIcon className="w-12 h-12 text-gray-300 mb-2 opacity-50" />
                                   <p>No documents found matching your filters.</p>
                               </td>
                           </tr>
@@ -484,7 +498,7 @@ const Dashboard: React.FC = () => {
                           <tr key={inv.id} className="hover:bg-gray-50 transition-colors group cursor-pointer border-b border-gray-100 last:border-0" onClick={() => navigate(`/view/${inv.id}`)}>
                               <td className="px-6 py-4">
                                   <div className="font-bold text-gray-700">{inv.invoiceNumber}</div>
-                                  <div className="mt-1">{getTypeBadge(inv.type)}</div>
+                                  <div className="mt-1 opacity-80">{getTypeBadge(inv.type)}</div>
                               </td>
                               <td className="px-6 py-4 text-gray-600">
                                   {inv.paidInvoiceNumber ? (
@@ -510,7 +524,7 @@ const Dashboard: React.FC = () => {
                                   <div className="flex justify-end gap-2" onClick={(e) => e.stopPropagation()}>
                                       <button 
                                           onClick={(e) => handleCopyLink(e, inv.id)}
-                                          className="p-1.5 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded transition-colors relative"
+                                          className="p-1.5 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors relative"
                                           title="Copy Link"
                                       >
                                           {copiedId === inv.id ? <CheckIcon className="w-5 h-5 text-green-600" /> : <LinkIcon className="w-5 h-5" />}
@@ -519,7 +533,7 @@ const Dashboard: React.FC = () => {
                                       {inv.status !== PaymentStatus.PAID && (
                                           <button 
                                               onClick={(e) => handleEdit(e, inv.id)}
-                                              className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors"
+                                              className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
                                               title="Edit"
                                           >
                                               <PencilIcon className="w-5 h-5" />
@@ -529,7 +543,7 @@ const Dashboard: React.FC = () => {
                                       {inv.type === 'INVOICE' && inv.status !== PaymentStatus.PAID && (
                                           <button 
                                               onClick={(e) => handleMarkAsPaid(e, inv.id, inv.invoiceNumber)}
-                                              className="p-1.5 text-gray-400 hover:text-green-600 hover:bg-green-50 rounded transition-colors"
+                                              className="p-1.5 text-gray-400 hover:text-green-600 hover:bg-green-50 rounded-lg transition-colors"
                                               title="Mark as Paid (Cash)"
                                           >
                                               <BanknotesIcon className="w-5 h-5" />
@@ -538,7 +552,7 @@ const Dashboard: React.FC = () => {
 
                                       <button 
                                           onClick={(e) => handleDelete(e, inv.id)}
-                                          className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
+                                          className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
                                           title="Delete"
                                       >
                                           <TrashIcon className="w-5 h-5" />
