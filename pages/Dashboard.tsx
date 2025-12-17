@@ -12,6 +12,25 @@ const INDIAN_STATES = [
   "Dadra and Nagar Haveli and Daman and Diu", "Delhi", "Jammu and Kashmir", "Ladakh", "Lakshadweep", "Puducherry"
 ];
 
+// Helper to format date to IST
+const formatDateToIST = (dateString: string) => {
+  if (!dateString) return '-';
+  try {
+    const date = new Date(dateString);
+    // Check if date is valid
+    if (isNaN(date.getTime())) return dateString;
+    
+    return date.toLocaleDateString('en-IN', {
+      timeZone: 'Asia/Kolkata',
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric'
+    });
+  } catch (e) {
+    return dateString;
+  }
+};
+
 const Dashboard: React.FC = () => {
   const navigate = useNavigate();
   const [invoices, setInvoices] = useState<InvoiceData[]>([]);
@@ -480,7 +499,7 @@ const Dashboard: React.FC = () => {
                                   {inv.placeOfSupply && <div className="text-xs text-gray-400 mt-0.5">{inv.placeOfSupply}</div>}
                               </td>
                               <td className="px-6 py-4 text-gray-600 whitespace-nowrap">
-                                  {inv.date}
+                                  {formatDateToIST(inv.date)}
                               </td>
                               <td className="px-6 py-4 text-right font-medium text-gray-900 whitespace-nowrap">
                                   {new Intl.NumberFormat('en-IN', { style: 'currency', currency: inv.currency }).format(inv.total)}
