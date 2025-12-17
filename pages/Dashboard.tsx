@@ -1,8 +1,8 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { InvoiceData, PaymentStatus, DocumentType } from '../types';
 import { InvoiceService } from '../services/invoiceService';
-import { PlusIcon, DocumentTextIcon, TrashIcon, MagnifyingGlassIcon, LinkIcon, CheckIcon, XMarkIcon, ArrowUpIcon, ArrowDownIcon, BanknotesIcon, PencilIcon, TagIcon, ClipboardDocumentListIcon, UsersIcon, Cog6ToothIcon, MapPinIcon, ArrowRightOnRectangleIcon, CalendarIcon, ClockIcon, ChevronDownIcon } from '@heroicons/react/24/outline';
+import { PlusIcon, DocumentTextIcon, TrashIcon, MagnifyingGlassIcon, LinkIcon, CheckIcon, XMarkIcon, ArrowUpIcon, ArrowDownIcon, BanknotesIcon, PencilIcon, TagIcon, ClipboardDocumentListIcon, UsersIcon, Cog6ToothIcon, MapPinIcon, ArrowRightOnRectangleIcon, CalendarIcon, ClockIcon, ChevronDownIcon, FunnelIcon } from '@heroicons/react/24/outline';
 
 const INDIAN_STATES = [
   "Andhra Pradesh", "Arunachal Pradesh", "Assam", "Bihar", "Chhattisgarh", "Goa", "Gujarat", "Haryana", 
@@ -48,20 +48,20 @@ const Dashboard: React.FC = () => {
   const [invoices, setInvoices] = useState<InvoiceData[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   
-  // Filter States
+  // Filter States for List
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('ALL');
   const [typeFilter, setTypeFilter] = useState<string>('ALL');
   const [placeOfSupplyFilter, setPlaceOfSupplyFilter] = useState<string>('ALL');
   
-  // Date Range - Defaults to Today
+  // Date Range for List - Defaults to Today
   const [dateRange, setDateRange] = useState({ 
       start: getLocalDateString(), 
       end: getLocalDateString() 
   });
   
-  // Stats Date Filter (For cards)
-  const [statsDate, setStatsDate] = useState(getLocalDateString());
+  // Stats Range Filter (For cards)
+  const [statsRangeOption, setStatsRangeOption] = useState('today');
 
   // Resource Filters
   const [resourceSectionFilter, setResourceSectionFilter] = useState('');
@@ -85,6 +85,68 @@ const Dashboard: React.FC = () => {
     setInvoices(data);
     setIsLoading(false);
   };
+
+  // Stats Calculation Logic
+  const statsData = useMemo(() => {
+    const now = new Date();
+    // Start of today (00:00:00)
+    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    // End of today (23:59:59)
+    const todayEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
+
+    let start = new Date(todayStart);
+    let end = new Date(todayEnd);
+    let label = "Today";
+
+    switch (statsRangeOption) {
+        case 'yesterday':
+            start.setDate(start.getDate() - 1);
+            end = new Date(start);
+            end.setHours(23, 59, 59, 999);
+            label = "Yesterday";
+            break;
+        case 'last_7':
+            start.setDate(start.getDate() - 6); // 7 days inclusive
+            label = "Last 7 Days";
+            break;
+        case 'last_15':
+            start.setDate(start.getDate() - 14); // 15 days inclusive
+            label = "Last 15 Days";
+            break;
+        case 'last_30':
+            start.setDate(start.getDate() - 29); // 30 days inclusive
+            label = "Last 30 Days";
+            break;
+        case 'this_month':
+            start = new Date(now.getFullYear(), now.getMonth(), 1);
+            label = "This Month";
+            break;
+        case 'last_month':
+            start = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+            end = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59, 999);
+            label = "Last Month";
+            break;
+        case 'today':
+        default:
+            label = "Today";
+            break;
+    }
+
+    const relevantInvoices = invoices.filter(inv => {
+        const d = new Date(inv.date);
+        return d >= start && d <= end;
+    });
+
+    const revenue = relevantInvoices
+        .filter(i => i.status === PaymentStatus.PAID && i.type === 'INVOICE')
+        .reduce((sum, i) => sum + i.total, 0);
+
+    const pending = relevantInvoices
+        .filter(i => i.status === PaymentStatus.PENDING && i.type === 'INVOICE')
+        .reduce((sum, i) => sum + i.total, 0);
+
+    return { revenue, pending, label };
+  }, [invoices, statsRangeOption]);
 
   const handleLogout = () => {
       localStorage.removeItem('isAuthenticated');
@@ -207,23 +269,6 @@ const Dashboard: React.FC = () => {
       );
   };
 
-  // Filter stats by selected date
-  const totalRevenue = invoices
-    .filter(i => 
-        i.status === PaymentStatus.PAID && 
-        i.type === 'INVOICE' && 
-        getLocalDateString(i.date) === statsDate
-    )
-    .reduce((sum, i) => sum + i.total, 0);
-
-  const pendingAmount = invoices
-    .filter(i => 
-        i.status === PaymentStatus.PENDING && 
-        i.type === 'INVOICE' && 
-        getLocalDateString(i.date) === statsDate
-    )
-    .reduce((sum, i) => sum + i.total, 0);
-
   // Filter Logic for List
   const filteredInvoices = invoices.filter((invoice) => {
     const query = searchQuery.toLowerCase();
@@ -277,9 +322,6 @@ const Dashboard: React.FC = () => {
     setStatusFilter('ALL');
     setTypeFilter('ALL');
     setPlaceOfSupplyFilter('ALL');
-    // Reset date range to empty to see all records, OR to today?
-    // Usually "Clear Filters" implies seeing everything. 
-    // If the user wants to see today again, they can reload or set date.
     setDateRange({ start: '', end: '' }); 
     setResourceSectionFilter('');
     setResourceNameFilter('');
@@ -337,19 +379,27 @@ const Dashboard: React.FC = () => {
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-8">
         
-        {/* Stats Header */}
+        {/* Stats Header with Dropdown */}
         <div className="flex items-center justify-between mb-4">
             <h3 className="text-gray-700 font-bold text-lg flex items-center gap-2">
-                Daily Overview
+                Performance Overview
             </h3>
             <div className="relative group">
-                <input 
-                    type="date" 
-                    value={statsDate}
-                    onChange={(e) => setStatsDate(e.target.value)}
-                    className="pl-10 pr-4 py-2 bg-white border border-gray-200 rounded-lg text-sm font-medium text-gray-700 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all hover:border-gray-300 cursor-pointer"
-                />
+                <select 
+                    value={statsRangeOption}
+                    onChange={(e) => setStatsRangeOption(e.target.value)}
+                    className="pl-10 pr-8 py-2 bg-white border border-gray-200 rounded-lg text-sm font-medium text-gray-700 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all hover:border-gray-300 cursor-pointer appearance-none"
+                >
+                    <option value="today">Today</option>
+                    <option value="yesterday">Yesterday</option>
+                    <option value="last_7">Last 7 Days</option>
+                    <option value="last_15">Last 15 Days</option>
+                    <option value="last_30">Last 30 Days</option>
+                    <option value="this_month">This Month</option>
+                    <option value="last_month">Last Month</option>
+                </select>
                 <CalendarIcon className="w-5 h-5 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none group-hover:text-indigo-500 transition-colors" />
+                <ChevronDownIcon className="w-4 h-4 text-gray-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
             </div>
         </div>
 
@@ -360,7 +410,7 @@ const Dashboard: React.FC = () => {
                 <div>
                     <p className="text-sm font-medium text-gray-500 mb-1">Total Revenue</p>
                     <p className="text-3xl font-bold text-gray-900 tracking-tight">
-                        {new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR' }).format(totalRevenue)}
+                        {new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR' }).format(statsData.revenue)}
                     </p>
                 </div>
                 <div className="p-3 bg-indigo-50 rounded-2xl group-hover:bg-indigo-100 transition-colors">
@@ -369,7 +419,7 @@ const Dashboard: React.FC = () => {
              </div>
              <div className="mt-4 flex items-center text-sm text-green-600 font-medium">
                 <ArrowUpIcon className="w-4 h-4 mr-1" />
-                <span>Paid on {statsDate}</span>
+                <span>Paid in {statsData.label}</span>
              </div>
           </div>
           <div className="relative overflow-hidden bg-white p-6 rounded-2xl shadow-[0_2px_10px_-3px_rgba(6,81,237,0.1)] border border-gray-100 group hover:border-amber-100 transition-all">
@@ -377,7 +427,7 @@ const Dashboard: React.FC = () => {
                 <div>
                     <p className="text-sm font-medium text-gray-500 mb-1">Pending Payments</p>
                     <p className="text-3xl font-bold text-gray-900 tracking-tight">
-                        {new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR' }).format(pendingAmount)}
+                        {new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR' }).format(statsData.pending)}
                     </p>
                 </div>
                 <div className="p-3 bg-amber-50 rounded-2xl group-hover:bg-amber-100 transition-colors">
@@ -385,7 +435,7 @@ const Dashboard: React.FC = () => {
                 </div>
              </div>
              <div className="mt-4 flex items-center text-sm text-amber-600 font-medium">
-                <span>Created on {statsDate}</span>
+                <span>Created in {statsData.label}</span>
              </div>
           </div>
         </div>
