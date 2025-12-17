@@ -130,7 +130,7 @@ const generateEmailContent = (invoice: InvoiceData, link: string, type: 'CREATED
             <div style="font-family: Arial, sans-serif; color: #333; line-height: 1.6;">
                  <p>Dear <strong>${invoice.buyerName}</strong>,</p>
                 <p>Greetings from ${invoice.businessName}.</p>
-                <p>Please find attached the Invoice (<strong>${finalNumber}</strong>) issued against ${docType} ${refNumber} for your reference.</p>
+                <p>Please find attached the Invoice <strong>${finalNumber}</strong> issued against ${docType} ${refNumber} for your reference.</p>
                 <p>We kindly request you to review the invoice and acknowledge receipt.</p>
                 <br/>
                 <p>Thank you for your continued association with us.</p>
