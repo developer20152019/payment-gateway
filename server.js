@@ -116,13 +116,28 @@ app.post('/api/invoices', async (req, res) => {
     try {
         await connection.beginTransaction();
         await connection.query(`
-            INSERT INTO Invoices (ID, InvoiceNumber, PaidInvoiceNumber, Type, Date, DueDate, Template, BrandColor, LogoUrl, SellerName, BusinessName, SellerAddress, SellerGstin, SellerEmail, SellerPhone, BuyerName, BuyerEmail, BuyerPhone, BuyerAddress, Subtotal, TaxRate, TaxAmount, Total, Currency, Status, PaymentGateway, Notes)
-            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
-            ON DUPLICATE KEY UPDATE Status=?, PaidInvoiceNumber=?, PaymentGateway=?, Notes=?
+            INSERT INTO Invoices (
+                ID, InvoiceNumber, PaidInvoiceNumber, Type, Date, DueDate, Template, BrandColor, LogoUrl, 
+                SellerName, BusinessName, SellerAddress, SellerGstin, SellerEmail, SellerPhone, 
+                BuyerName, BuyerEmail, BuyerPhone, BuyerAddress, BuyerShippingAddress, PlaceOfSupply, BuyerPinCode, 
+                Subtotal, TaxRate, TaxAmount, Total, Currency, Status, PaymentGateway, Notes
+            )
+            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+            ON DUPLICATE KEY UPDATE 
+                Status=VALUES(Status), 
+                PaidInvoiceNumber=VALUES(PaidInvoiceNumber), 
+                PaymentGateway=VALUES(PaymentGateway), 
+                Notes=VALUES(Notes),
+                BuyerAddress=VALUES(BuyerAddress),
+                BuyerPhone=VALUES(BuyerPhone),
+                BuyerEmail=VALUES(BuyerEmail)
         `, [
-            inv.id, inv.invoiceNumber, inv.paidInvoiceNumber, inv.type, sqlDate, sqlDueDate, inv.template, inv.brandColor, inv.logoUrl, inv.sellerName, inv.businessName, inv.sellerAddress, inv.sellerGstin, inv.sellerEmail, inv.sellerPhone, inv.buyerName, inv.buyerEmail, inv.buyerPhone, inv.buyerAddress, inv.subtotal, inv.taxRate, inv.taxAmount, inv.total, inv.currency, inv.status, inv.paymentGateway, inv.notes,
-            inv.status, inv.paidInvoiceNumber, inv.paymentGateway, inv.notes
+            inv.id, inv.invoiceNumber, inv.paidInvoiceNumber, inv.type, sqlDate, sqlDueDate, inv.template, inv.brandColor, inv.logoUrl, 
+            inv.sellerName, inv.businessName, inv.sellerAddress, inv.sellerGstin, inv.sellerEmail, inv.sellerPhone, 
+            inv.buyerName, inv.buyerEmail, inv.buyerPhone, inv.buyerAddress, inv.buyerShippingAddress, inv.placeOfSupply, inv.buyerPinCode, 
+            inv.subtotal, inv.taxRate, inv.taxAmount, inv.total, inv.currency, inv.status, inv.paymentGateway, inv.notes
         ]);
+
         await connection.query('DELETE FROM LineItems WHERE InvoiceID = ?', [inv.id]);
         if (inv.items?.length > 0) {
             const itemValues = inv.items.map((it, idx) => [`li_${inv.id}_${idx}`, inv.id, it.name, it.description, it.quantity, it.rate, it.amount]);
@@ -132,6 +147,7 @@ app.post('/api/invoices', async (req, res) => {
         res.json({ success: true, paidInvoiceNumber: inv.paidInvoiceNumber });
     } catch (err) {
         await connection.rollback();
+        console.error("Save Error:", err);
         res.status(500).json({ error: err.message });
     } finally {
         connection.release();
@@ -140,8 +156,8 @@ app.post('/api/invoices', async (req, res) => {
 
 // Real/Mock Notifications
 app.post('/api/notify', async (req, res) => {
-    const payload = req.body;
-    console.log(`[EMAIL] Sending ${payload.type} to ${payload.to} for amount ${payload.total}`);
+    const p = req.body;
+    console.log(`[EMAIL SENDING] Trigger: ${p.type} | To: ${p.to} | Inv: ${p.invoiceNumber}`);
     
     if (process.env.SMTP_HOST) {
         try {
@@ -153,32 +169,35 @@ app.post('/api/notify', async (req, res) => {
             });
             await transporter.sendMail({
                 from: process.env.SMTP_FROM || '"Wappie Finance" <no-reply@wappie.in>',
-                to: payload.to,
-                subject: payload.subject,
-                html: `<p>Dear Client, your ${payload.type === 'PAID' ? 'receipt' : 'invoice'} for ${payload.currency} ${payload.total} is ready.</p><p><a href="${payload.link}">View Document</a></p>`
+                to: p.to,
+                subject: p.subject || `Document ${p.invoiceNumber} Notification`,
+                html: `<div style="font-family:sans-serif;"><h3>Hello ${p.buyerName},</h3><p>Your ${p.type === 'PAID' ? 'receipt' : 'invoice'} for <b>${p.currency} ${p.total}</b> is ready.</p><p><a href="${p.link}">Click here to view document</a></p></div>`
             });
             return res.json({ success: true });
-        } catch (e) { return res.status(500).json({ error: 'SMTP failed' }); }
+        } catch (e) { return res.status(500).json({ error: 'SMTP Error' }); }
     }
     res.json({ success: true, mock: true });
 });
 
 app.post('/api/whatsapp/send', (req, res) => {
-    const payload = req.body;
-    console.log(`[WHATSAPP] Sending ${payload.type} to ${payload.to}. Link: ${payload.link}`);
+    const p = req.body;
+    console.log(`[WHATSAPP SENDING] Trigger: ${p.type} | To: ${p.to} | Link: ${p.link}`);
     res.json({ success: true, mock: true });
 });
 
 app.post('/api/payment/initiate', (req, res) => {
-    const { amount, currency, order_id } = req.body;
-    // For production, this would generate the encrypted request for CCAvenue
+    const { amount, currency, order_id, billing_name } = req.body;
     res.send(`
-        <html><body>
-        <h3>Secure Checkout</h3>
-        <p>Order: ${order_id}</p>
-        <p>Amount: ${currency} ${amount}</p>
-        <button onclick="window.parent.postMessage('PAYMENT_SUCCESS', '*')">Simulate Success</button>
-        <button onclick="window.parent.postMessage('PAYMENT_CANCEL', '*')">Simulate Cancel</button>
+        <html><body style="font-family:sans-serif; text-align:center; padding: 50px; background:#f4f7f6;">
+            <div style="background:white; padding:30px; border-radius:15px; display:inline-block; border:1px solid #ddd;">
+                <h2 style="color:#4f46e5;">Secure Checkout</h2>
+                <p>Order: ${order_id}</p>
+                <p>Payable: <b>${currency} ${amount}</b></p>
+                <div style="margin-top:20px;">
+                    <button style="padding:10px 20px; background:#10b981; color:white; border:none; border-radius:5px; cursor:pointer;" onclick="window.parent.postMessage('PAYMENT_SUCCESS', '*')">Simulate Success</button>
+                    <button style="padding:10px 20px; background:#ef4444; color:white; border:none; border-radius:5px; cursor:pointer;" onclick="window.parent.postMessage('PAYMENT_CANCEL', '*')">Cancel</button>
+                </div>
+            </div>
         </body></html>
     `);
 });
