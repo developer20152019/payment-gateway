@@ -1,25 +1,43 @@
 import React, { useState, useEffect, useCallback } from 'react';
-// Fix: Ensure correct named exports for useParams, useNavigate, and useLocation to resolve react-router-dom module errors
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { InvoiceData, PaymentStatus } from '../types';
 import { InvoicePreview } from '../components/InvoicePreview';
-import { ShieldCheckIcon, ShareIcon, ArrowDownTrayIcon, ChatBubbleLeftRightIcon, EnvelopeIcon } from '@heroicons/react/24/outline';
+import { CCAvenueModal } from '../components/CCAvenueModal';
+import { PaymentSimulationModal } from '../components/PaymentSimulationModal';
+import { 
+  ShieldCheckIcon, 
+  ShareIcon, 
+  ArrowDownTrayIcon, 
+  ChatBubbleLeftRightIcon, 
+  EnvelopeIcon,
+  CheckCircleIcon
+} from '@heroicons/react/24/outline';
 import { InvoiceService } from '../services/invoiceService';
 
 const ViewInvoice: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const location = useLocation();
+  
   const [invoice, setInvoice] = useState<InvoiceData | null>(null);
   const [isDownloading, setIsDownloading] = useState(false);
-  const [notification, setNotification] = useState<{message: string, type: string} | null>(null);
+  const [notification, setNotification] = useState<{message: string, type: 'success' | 'error'} | null>(null);
   const [isNotifying, setIsNotifying] = useState(false);
+  
+  // Payment States
+  const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
+  const [paymentHtml, setPaymentHtml] = useState('');
+  const [isPaymentLoading, setIsPaymentLoading] = useState(false);
+  const [isSimulationOpen, setIsSimulationOpen] = useState(false);
 
   const fetchInvoice = useCallback(async () => {
     if (id) {
       const data = await InvoiceService.getInvoiceById(id);
-      if (data) setInvoice(data);
-      else navigate('/');
+      if (data) {
+        setInvoice(data);
+      } else {
+        navigate('/');
+      }
     }
   }, [id, navigate]);
 
@@ -27,36 +45,92 @@ const ViewInvoice: React.FC = () => {
     fetchInvoice();
   }, [fetchInvoice]);
 
-  // Handle automatic notifications when coming from Create/Edit page
+  // Trigger notifications automatically if arriving from "Create"
   useEffect(() => {
     if (invoice && location.state?.autoSendEmail && !isNotifying) {
-        handleSendNotifications();
-        // Clear state to avoid re-triggering on refresh
+        handleSendNotifications('CREATED');
+        // Clear the state so it doesn't resend on page refresh
         window.history.replaceState({}, document.title);
     }
   }, [invoice, location.state]);
 
-  const handleSendNotifications = async () => {
+  const showToast = (message: string, type: 'success' | 'error' = 'success') => {
+    setNotification({ message, type });
+    setTimeout(() => setNotification(null), 4000);
+  };
+
+  const handleSendNotifications = async (trigger: 'CREATED' | 'PAID') => {
     if (!invoice) return;
     setIsNotifying(true);
     try {
         await Promise.all([
-            InvoiceService.sendEmailNotification(invoice, 'CREATED'),
-            InvoiceService.sendWhatsAppNotification(invoice, 'CREATED')
+            InvoiceService.sendEmailNotification(invoice, trigger),
+            InvoiceService.sendWhatsAppNotification(invoice, trigger)
         ]);
-        setNotification({ message: 'Notifications sent to client!', type: 'success' });
+        showToast(`Notifications (${trigger}) sent to client!`);
     } catch (e) {
-        setNotification({ message: 'Failed to send some notifications', type: 'error' });
+        console.error("Notification Error:", e);
+        showToast("Failed to send some notifications", "error");
     } finally {
         setIsNotifying(false);
-        setTimeout(() => setNotification(null), 3000);
     }
   };
 
+  const handlePaymentSuccess = async () => {
+    if (!invoice) return;
+    setIsPaymentModalOpen(false);
+    setIsSimulationOpen(false);
+    
+    try {
+        // 1. Update Database
+        await InvoiceService.updateStatus(invoice.id, PaymentStatus.PAID, 'CCAvenue');
+        
+        // 2. Refresh Local Data
+        await fetchInvoice();
+        
+        // 3. Send PAID Notifications
+        await handleSendNotifications('PAID');
+        
+        showToast("Payment successful! Invoice updated and client notified.");
+    } catch (error) {
+        showToast("Payment recorded but notification failed.", "error");
+    }
+  };
+
+  const handleInitiatePayment = async () => {
+    if (!invoice) return;
+    setIsPaymentLoading(true);
+    setIsPaymentModalOpen(true);
+
+    try {
+      const { paymentHtml } = await InvoiceService.initiatePaymentSequence(invoice);
+      setPaymentHtml(paymentHtml);
+    } catch (error) {
+      console.error("Payment Initiation Failed:", error);
+      setIsSimulationOpen(true);
+    } finally {
+      setIsPaymentLoading(false);
+    }
+  };
+
+  // Listen for iframe messages from CCAvenue/Mock Gateway
+  useEffect(() => {
+    const handleMessage = (event: MessageEvent) => {
+      if (event.data === 'PAYMENT_SUCCESS') {
+        handlePaymentSuccess();
+      } else if (event.data === 'PAYMENT_CANCEL') {
+        setIsPaymentModalOpen(false);
+        setIsSimulationOpen(false);
+        showToast("Payment cancelled by user", "error");
+      }
+    };
+    window.addEventListener('message', handleMessage);
+    return () => window.removeEventListener('message', handleMessage);
+  }, [invoice]);
+
   const handleCopyLink = () => {
     navigator.clipboard.writeText(window.location.href);
-    setNotification({ message: 'Link copied!', type: 'success' });
-    setTimeout(() => setNotification(null), 3000);
+    showToast("Shareable link copied!");
   };
 
   const handleDownloadPdf = async () => {
@@ -70,17 +144,25 @@ const ViewInvoice: React.FC = () => {
       html2canvas: { scale: 2 },
       jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
     };
-    await (window as any).html2pdf().from(element).set(opt).save();
-    setIsDownloading(false);
+    try {
+        await (window as any).html2pdf().from(element).set(opt).save();
+    } catch (e) {
+        showToast("PDF generation failed", "error");
+    } finally {
+        setIsDownloading(false);
+    }
   };
 
-  if (!invoice) return <div className="p-8 text-center text-gray-500">Loading...</div>;
+  if (!invoice) return <div className="p-8 text-center text-gray-500">Loading document...</div>;
 
   return (
     <div className="min-h-screen bg-gray-50 pb-20">
       {notification && (
         <div className={`fixed top-5 left-1/2 -translate-x-1/2 z-[100] px-6 py-3 rounded-full shadow-2xl animate-bounce-in text-white ${notification.type === 'error' ? 'bg-red-600' : 'bg-gray-900'}`}>
-          {notification.message}
+          <div className="flex items-center gap-2 font-medium">
+            {notification.type === 'success' && <CheckCircleIcon className="w-5 h-5 text-green-400" />}
+            {notification.message}
+          </div>
         </div>
       )}
 
@@ -91,10 +173,10 @@ const ViewInvoice: React.FC = () => {
              Wappie Finance
           </div>
           <div className="flex gap-2">
-            <button onClick={handleDownloadPdf} disabled={isDownloading} className="p-2 text-gray-600 hover:bg-gray-100 rounded-full transition-all">
+            <button onClick={handleDownloadPdf} disabled={isDownloading} className="p-2 text-gray-600 hover:bg-gray-100 rounded-full transition-all" title="Download PDF">
                <ArrowDownTrayIcon className={`w-6 h-6 ${isDownloading ? 'animate-pulse text-indigo-500' : ''}`} />
             </button>
-            <button onClick={handleCopyLink} className="p-2 text-gray-600 hover:bg-gray-100 rounded-full">
+            <button onClick={handleCopyLink} className="p-2 text-gray-600 hover:bg-gray-100 rounded-full" title="Copy Share Link">
                <ShareIcon className="w-6 h-6" />
             </button>
           </div>
@@ -125,8 +207,12 @@ const ViewInvoice: React.FC = () => {
                         <p className="text-xs text-gray-400 mb-1 uppercase font-bold tracking-wider">Payable Amount</p>
                         <p className="text-3xl font-black text-gray-900">{new Intl.NumberFormat('en-IN', { style: 'currency', currency: invoice.currency }).format(invoice.total)}</p>
                     </div>
-                    {invoice.status !== PaymentStatus.PAID && (
-                        <button onClick={() => alert('Payment sequence started')} className="w-full bg-indigo-600 text-white py-4 rounded-xl font-bold text-lg hover:bg-indigo-700 transition-all shadow-xl shadow-indigo-100 flex items-center justify-center gap-2">
+                    
+                    {invoice.status !== PaymentStatus.PAID && invoice.type === 'INVOICE' && (
+                        <button 
+                            onClick={handleInitiatePayment} 
+                            className="w-full bg-indigo-600 text-white py-4 rounded-xl font-bold text-lg hover:bg-indigo-700 transition-all shadow-xl shadow-indigo-100 flex items-center justify-center gap-2"
+                        >
                             <ShieldCheckIcon className="w-6 h-6" /> Pay Securely
                         </button>
                     )}
@@ -134,28 +220,45 @@ const ViewInvoice: React.FC = () => {
                 </div>
 
                 <div className="pt-6 border-t border-gray-100">
-                    <h4 className="text-xs font-bold text-gray-400 uppercase mb-4 tracking-widest">Quick Actions</h4>
+                    <h4 className="text-xs font-bold text-gray-400 uppercase mb-4 tracking-widest">Client Engagement</h4>
                     <div className="grid grid-cols-1 gap-3">
                         <button 
-                            onClick={handleSendNotifications} 
+                            onClick={() => handleSendNotifications('CREATED')} 
                             disabled={isNotifying}
                             className="flex items-center gap-3 w-full p-3 rounded-xl border border-gray-100 hover:bg-gray-50 transition-colors text-sm font-medium text-gray-700 disabled:opacity-50"
                         >
                             <EnvelopeIcon className="w-5 h-5 text-indigo-500" />
-                            Resend Notifications
+                            Send Reminders
                         </button>
                         <button 
-                            onClick={() => window.open(`https://wa.me/${invoice.buyerPhone?.replace(/\D/g, '')}?text=Hello ${invoice.buyerName}, your ${invoice.type.toLowerCase()} ${invoice.invoiceNumber} is ready: ${window.location.href}`, '_blank')}
+                            onClick={() => window.open(`https://wa.me/${invoice.buyerPhone?.replace(/\D/g, '')}?text=Hello ${invoice.buyerName}, your ${invoice.type.toLowerCase()} ${invoice.invoiceNumber} is ready for review: ${window.location.href}`, '_blank')}
                             className="flex items-center gap-3 w-full p-3 rounded-xl border border-gray-100 hover:bg-gray-50 transition-colors text-sm font-medium text-gray-700"
                         >
                             <ChatBubbleLeftRightIcon className="w-5 h-5 text-green-500" />
-                            Direct WhatsApp
+                            Message via WhatsApp
                         </button>
                     </div>
                 </div>
              </div>
           </div>
       </div>
+
+      <CCAvenueModal 
+        isOpen={isPaymentModalOpen} 
+        onClose={() => setIsPaymentModalOpen(false)} 
+        paymentHtml={paymentHtml} 
+        isLoading={isPaymentLoading} 
+      />
+
+      <PaymentSimulationModal 
+        isOpen={isSimulationOpen}
+        onClose={() => setIsSimulationOpen(false)}
+        onSuccess={handlePaymentSuccess}
+        onFailure={() => { setIsSimulationOpen(false); showToast("Payment failed simulation", "error"); }}
+        amount={invoice.total}
+        currency={invoice.currency}
+        gatewayName="CCAvenue"
+      />
     </div>
   );
 };

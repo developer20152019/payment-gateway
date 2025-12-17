@@ -1,5 +1,4 @@
 import React, { useEffect, useState } from 'react';
-// Fix: Ensure correct named exports for useParams and useNavigate to resolve react-router-dom module errors
 import { useParams, useNavigate } from 'react-router-dom';
 import { InvoiceData, LineItem, PaymentStatus, Product, DocumentType, Customer } from '../types';
 import { PlusIcon, TrashIcon, ArrowPathIcon, ChevronLeftIcon, UserPlusIcon, XMarkIcon } from '@heroicons/react/24/outline';
@@ -326,7 +325,6 @@ const CreateInvoice: React.FC = () => {
     if (!invoice.invoiceNumber) missingFields.push("Reference Number");
     if (!invoice.date) missingFields.push("Date");
     if (!invoice.buyerName) missingFields.push("Client Name");
-    if (docType === 'INVOICE' && !invoice.paymentGateway) missingFields.push("Payment Gateway");
     if (!invoice.resourceSection) missingFields.push("Resource Section");
     if (!invoice.resourceName) missingFields.push("Resource Name");
     if (missingFields.length > 0) {
@@ -337,7 +335,8 @@ const CreateInvoice: React.FC = () => {
     try {
         const invoiceToSave = { ...invoice, type: docType };
         await InvoiceService.saveInvoice(invoiceToSave);
-        navigate(`/view/${invoiceToSave.id}`, { state: { autoSendEmail: true, openShare: true } });
+        // CRITICAL: Navigate with autoSendEmail state to trigger view notifications
+        navigate(`/view/${invoiceToSave.id}`, { state: { autoSendEmail: true } });
     } catch (error) {
         alert("An error occurred while saving the document.");
     } finally {
