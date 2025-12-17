@@ -6,6 +6,7 @@ const mysql = require('mysql2/promise');
 const crypto = require('crypto');
 const Razorpay = require('razorpay');
 const nodemailer = require('nodemailer');
+const path = require('path');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -14,6 +15,9 @@ const PORT = process.env.PORT || 3000;
 app.use(cors());
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
+
+// --- Serve React Build Files (Production) ---
+app.use(express.static(path.join(__dirname, 'dist')));
 
 // --- Database Connection ---
 const dbConfig = {
@@ -601,6 +605,16 @@ app.post('/api/payment/ccavResponseHandler', async (req, res) => {
     }
 
     res.send(htmlResponse);
+});
+
+// --- SPA Fallback (MUST BE LAST) ---
+// Serve React App for any other route that isn't an API route
+app.get('*', (req, res) => {
+    // Only serve index.html for non-API routes to allow React Router to handle the path
+    if (req.path.startsWith('/api')) {
+        return res.status(404).json({ error: 'API endpoint not found' });
+    }
+    res.sendFile(path.join(__dirname, 'dist', 'index.html'));
 });
 
 app.listen(PORT, () => {

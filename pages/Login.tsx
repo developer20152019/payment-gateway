@@ -16,7 +16,7 @@ const Login: React.FC = () => {
         localStorage.setItem('isAuthenticated', 'true');
         navigate('/');
     } else {
-        setError('Invalid credentials (Try: admin@paylink.com / admin123)');
+        setError('Invalid credentials.');
     }
   };
 
@@ -27,7 +27,7 @@ const Login: React.FC = () => {
             <DocumentTextIcon className="h-12 w-12" />
         </div>
         <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
-          Sign in to PayLink
+          Sign in to Wappie Finance
         </h2>
         <p className="mt-2 text-center text-sm text-gray-600">
           Or <a href="#" className="font-medium text-indigo-600 hover:text-indigo-500">contact support</a> for access.
