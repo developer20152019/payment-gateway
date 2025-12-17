@@ -341,10 +341,11 @@ const Dashboard: React.FC = () => {
                 )}
              </div>
 
-             <div className="space-y-3">
-                 <div className="grid grid-cols-1 md:grid-cols-12 gap-3">
+             <div className="space-y-4">
+                 {/* Row 1: Primary Filters (Flex Wrap) */}
+                 <div className="flex flex-wrap gap-3 items-center">
                     {/* 1. Search */}
-                    <div className="md:col-span-3 relative">
+                    <div className="relative flex-grow min-w-[220px]">
                         <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                         <MagnifyingGlassIcon className="h-4 w-4 text-gray-400" />
                         </div>
@@ -358,7 +359,7 @@ const Dashboard: React.FC = () => {
                     </div>
 
                     {/* 2. Type Dropdown */}
-                    <div className="md:col-span-2 relative">
+                    <div className="relative w-full sm:w-auto sm:min-w-[140px]">
                         <select
                             className="block w-full px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white text-gray-700 focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 transition-all appearance-none"
                             value={typeFilter}
@@ -374,7 +375,7 @@ const Dashboard: React.FC = () => {
                     </div>
 
                     {/* 3. Status Dropdown */}
-                    <div className="md:col-span-2 relative">
+                    <div className="relative w-full sm:w-auto sm:min-w-[140px]">
                         <select
                             className="block w-full px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white text-gray-700 focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 transition-all appearance-none"
                             value={statusFilter}
@@ -392,7 +393,7 @@ const Dashboard: React.FC = () => {
                     </div>
 
                     {/* 4. Place of Supply Filter */}
-                    <div className="md:col-span-2 relative">
+                    <div className="relative w-full sm:w-auto sm:min-w-[160px]">
                         <div className="absolute inset-y-0 left-0 pl-2 flex items-center pointer-events-none">
                             <MapPinIcon className="h-4 w-4 text-gray-400" />
                         </div>
@@ -407,7 +408,7 @@ const Dashboard: React.FC = () => {
                     </div>
 
                     {/* 5. Date Range */}
-                    <div className="md:col-span-3 flex gap-2 items-center">
+                    <div className="flex gap-2 items-center w-full sm:w-auto sm:min-w-[300px]">
                         <input
                             type="date"
                             className="block w-full border border-gray-300 rounded-lg text-sm p-2 text-gray-600 focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 transition-all"
@@ -426,8 +427,8 @@ const Dashboard: React.FC = () => {
                     </div>
                  </div>
 
-                 {/* Resource Filters Row */}
-                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-2 border-t border-gray-200 border-dashed">
+                 {/* Row 2: Resource Filters */}
+                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-3 border-t border-gray-200 border-dashed">
                     <div className="relative">
                         <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                             <ClipboardDocumentListIcon className="h-4 w-4 text-gray-400" />
