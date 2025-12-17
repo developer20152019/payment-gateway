@@ -16,18 +16,19 @@ const INDIAN_STATES = [
 ];
 
 const RESOURCE_SECTIONS = [
-  "Marketing", 
-  "Sales", 
-  "Development", 
-  "Human Resources", 
-  "Operations", 
-  "Finance"
+    "Google",
+    "Facebook",
+    "Linkedin",
+    "Cold Calling",
+    "Website",
+    "Recharge",
+    "Reference"
 ];
 
 const RESOURCE_NAMES = [
-  "Project Alpha", 
-  "Project Beta", 
-  "Project Gamma"
+  "Swapan Dutta", 
+  "Sharbhashish Nayak", 
+  "Dipraj Nath"
 ];
 
 const generateInvoiceNumber = () => {
