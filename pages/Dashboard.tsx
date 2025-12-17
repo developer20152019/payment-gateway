@@ -1,8 +1,5 @@
-
 import React, { useEffect, useState, useMemo } from 'react';
-// Fix: Use a module-level import to avoid named export type errors in the current environment
-import * as ReactRouterDOM from 'react-router-dom';
-const { useNavigate } = ReactRouterDOM as any;
+import { useNavigate } from 'react-router';
 import { InvoiceData, PaymentStatus, DocumentType } from '../types';
 import { InvoiceService } from '../services/invoiceService';
 import { 

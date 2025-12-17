@@ -1,8 +1,7 @@
 
 import React from 'react';
-// Fix: Use a module-level import to avoid named export type errors in the current environment
-import * as ReactRouterDOM from 'react-router-dom';
-const { HashRouter, Routes, Route, Navigate } = ReactRouterDOM as any;
+// Changed import from 'react-router-dom' to 'react-router' to fix v7 export errors
+import { HashRouter, Routes, Route, Navigate, useLocation } from 'react-router';
 import CreateInvoice from './pages/CreateInvoice';
 import ViewInvoice from './pages/ViewInvoice';
 import Dashboard from './pages/Dashboard';
