@@ -53,9 +53,14 @@ const Dashboard: React.FC = () => {
   const [statusFilter, setStatusFilter] = useState<string>('ALL');
   const [typeFilter, setTypeFilter] = useState<string>('ALL');
   const [placeOfSupplyFilter, setPlaceOfSupplyFilter] = useState<string>('ALL');
-  const [dateRange, setDateRange] = useState({ start: '', end: '' });
   
-  // Stats Date Filter
+  // Date Range - Defaults to Today
+  const [dateRange, setDateRange] = useState({ 
+      start: getLocalDateString(), 
+      end: getLocalDateString() 
+  });
+  
+  // Stats Date Filter (For cards)
   const [statsDate, setStatsDate] = useState(getLocalDateString());
 
   // Resource Filters
@@ -243,13 +248,14 @@ const Dashboard: React.FC = () => {
     let matchesStart = true;
     if (dateRange.start) {
         const startDate = new Date(dateRange.start);
+        startDate.setHours(0, 0, 0, 0); // Start of day
         matchesStart = invoiceDate >= startDate;
     }
 
     let matchesEnd = true;
     if (dateRange.end) {
         const endDate = new Date(dateRange.end);
-        endDate.setHours(23, 59, 59, 999);
+        endDate.setHours(23, 59, 59, 999); // End of day
         matchesEnd = invoiceDate <= endDate;
     }
 
@@ -271,7 +277,10 @@ const Dashboard: React.FC = () => {
     setStatusFilter('ALL');
     setTypeFilter('ALL');
     setPlaceOfSupplyFilter('ALL');
-    setDateRange({ start: '', end: '' });
+    // Reset date range to empty to see all records, OR to today?
+    // Usually "Clear Filters" implies seeing everything. 
+    // If the user wants to see today again, they can reload or set date.
+    setDateRange({ start: '', end: '' }); 
     setResourceSectionFilter('');
     setResourceNameFilter('');
   };
