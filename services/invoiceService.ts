@@ -128,7 +128,7 @@ const generateEmailContent = (invoice: InvoiceData, link: string, type: 'CREATED
         const subject = `Invoice ${finalNumber} for ${docType} ${refNumber}`;
         const body = `
             <div style="font-family: Arial, sans-serif; color: #333; line-height: 1.6;">
-                <p>Dear Customer,</p>
+                 <p>Dear <strong>${invoice.buyerName}</strong>,</p>
                 <p>Greetings from ${invoice.businessName}.</p>
                 <p>Please find attached the Invoice (<strong>${finalNumber}</strong>) issued against ${docType} ${refNumber} for your reference.</p>
                 <p>We kindly request you to review the invoice and acknowledge receipt.</p>
@@ -151,7 +151,7 @@ const generateEmailContent = (invoice: InvoiceData, link: string, type: 'CREATED
 
         const body = `
             <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; background-color: #ffffff; color: #333;">
-                <p>Dear <strong>"${invoice.buyerName}"</strong>,</p>
+                <p>Dear <strong>${invoice.buyerName}</strong>,</p>
                 <p>Thank you for contacting us. Your ${docType.toLowerCase()} can be paid, viewed, printed and downloaded as PDF from the link below.</p>
                 
                 <!-- CARD TEMPLATE -->
