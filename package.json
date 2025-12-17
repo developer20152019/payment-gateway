@@ -7,6 +7,8 @@
     "start": "node server.js",
     "server": "node server.js",
     "client": "vite",
+    "client:build": "vite build",
+    "client:preview": "vite preview",
     "dev": "node dev-runner.js"
   },
   "dependencies": {
