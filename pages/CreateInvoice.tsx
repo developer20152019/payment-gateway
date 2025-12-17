@@ -77,7 +77,7 @@ const getInitialInvoice = (): InvoiceData => ({
     { id: `item_${Date.now()}`, name: '', description: '', quantity: 1, rate: 0, amount: 0 },
   ],
   subtotal: 0,
-  taxRate: 18,
+  taxRate: 0, // Default Tax Rate set to 0
   taxAmount: 0,
   total: 0,
   currency: 'INR',
@@ -406,6 +406,9 @@ const CreateInvoice: React.FC = () => {
         missingFields.push("Payment Gateway");
     }
 
+    if (!invoice.resourceSection) missingFields.push("Resource Section");
+    if (!invoice.resourceName) missingFields.push("Resource Name");
+
     let itemsValid = true;
     invoice.items.forEach((item) => {
         if (!item.name || item.name.trim() === '') {
@@ -545,9 +548,11 @@ const CreateInvoice: React.FC = () => {
                     {/* Resources & Payment Gateway */}
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4 p-4 bg-gray-50 rounded-lg border border-gray-100">
                         <div>
-                            <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Resource Section</label>
+                            <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">
+                                Resource Section <span className="text-red-500">*</span>
+                            </label>
                             <select 
-                                className="w-full border border-gray-300 rounded-md p-2 text-sm bg-white focus:ring-indigo-500 focus:border-indigo-500"
+                                className={`w-full border rounded-md p-2 text-sm bg-white focus:ring-indigo-500 focus:border-indigo-500 ${!invoice.resourceSection ? 'border-amber-300 bg-amber-50' : 'border-gray-300'}`}
                                 value={invoice.resourceSection}
                                 onChange={(e) => handleChange('resourceSection', e.target.value)}
                             >
@@ -556,9 +561,11 @@ const CreateInvoice: React.FC = () => {
                             </select>
                         </div>
                         <div>
-                            <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Resource Name</label>
+                            <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">
+                                Resource Name <span className="text-red-500">*</span>
+                            </label>
                             <select 
-                                className="w-full border border-gray-300 rounded-md p-2 text-sm bg-white focus:ring-indigo-500 focus:border-indigo-500"
+                                className={`w-full border rounded-md p-2 text-sm bg-white focus:ring-indigo-500 focus:border-indigo-500 ${!invoice.resourceName ? 'border-amber-300 bg-amber-50' : 'border-gray-300'}`}
                                 value={invoice.resourceName}
                                 onChange={(e) => handleChange('resourceName', e.target.value)}
                             >
