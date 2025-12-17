@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { InvoiceData, PaymentStatus, DocumentType } from '../types';
 import { InvoiceService } from '../services/invoiceService';
-import { PlusIcon, DocumentTextIcon, TrashIcon, MagnifyingGlassIcon, LinkIcon, CheckIcon, XMarkIcon, FunnelIcon, ArrowUpIcon, ArrowDownIcon, BanknotesIcon, PencilIcon, TagIcon, ClipboardDocumentListIcon, UsersIcon, Cog6ToothIcon, MapPinIcon, ArrowRightOnRectangleIcon } from '@heroicons/react/24/outline';
+import { PlusIcon, DocumentTextIcon, TrashIcon, MagnifyingGlassIcon, LinkIcon, CheckIcon, XMarkIcon, ArrowUpIcon, ArrowDownIcon, BanknotesIcon, PencilIcon, TagIcon, ClipboardDocumentListIcon, UsersIcon, Cog6ToothIcon, MapPinIcon, ArrowRightOnRectangleIcon, CalendarIcon } from '@heroicons/react/24/outline';
 
 const INDIAN_STATES = [
   "Andhra Pradesh", "Arunachal Pradesh", "Assam", "Bihar", "Chhattisgarh", "Goa", "Gujarat", "Haryana", 
@@ -230,6 +230,8 @@ const Dashboard: React.FC = () => {
     let matchesEnd = true;
     if (dateRange.end) {
         const endDate = new Date(dateRange.end);
+        // Set end date to end of day
+        endDate.setHours(23, 59, 59, 999);
         matchesEnd = invoiceDate <= endDate;
     }
 
@@ -323,61 +325,71 @@ const Dashboard: React.FC = () => {
         {/* Invoice List Container */}
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
           
-          {/* Header & Filter Controls */}
-          <div className="border-b border-gray-200 bg-gray-50 p-5">
-             <div className="flex flex-col md:flex-row md:justify-between md:items-center mb-4 gap-2">
-                <div className="flex items-center gap-2">
-                    <h2 className="font-bold text-gray-800 text-lg">Documents</h2>
-                    <span className="text-xs bg-gray-200 text-gray-600 px-2.5 py-0.5 rounded-full font-medium">{sortedInvoices.length}</span>
+          {/* --- NEW FILTER SECTION --- */}
+          <div className="border-b border-gray-200 bg-white p-5">
+             <div className="flex justify-between items-center mb-6">
+                <div className="flex items-center gap-3">
+                    <h2 className="font-bold text-gray-900 text-lg">Documents</h2>
+                    <span className="bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full text-xs font-semibold">{sortedInvoices.length}</span>
                 </div>
-                
                 {hasActiveFilters && (
-                    <button 
-                        onClick={clearFilters} 
-                        className="text-xs font-medium text-red-600 hover:text-red-800 hover:bg-red-50 px-2 py-1 rounded transition-colors flex items-center gap-1 self-start md:self-auto"
-                    >
-                        <XMarkIcon className="w-3.5 h-3.5" /> Clear Filters
+                    <button onClick={clearFilters} className="text-sm text-red-600 hover:text-red-800 font-medium flex items-center gap-1">
+                        <XMarkIcon className="w-4 h-4" /> Clear Filters
                     </button>
                 )}
              </div>
 
-             <div className="space-y-4">
-                 {/* Row 1: Primary Filters (Flex Wrap) */}
-                 <div className="flex flex-wrap gap-3 items-center">
-                    {/* 1. Search */}
-                    <div className="relative flex-grow min-w-[220px]">
-                        <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                        <MagnifyingGlassIcon className="h-4 w-4 text-gray-400" />
-                        </div>
-                        <input
-                        type="text"
-                        placeholder="Search client, email, #..."
-                        className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg text-sm bg-white placeholder-gray-400 focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 transition-all"
-                        value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
-                        />
-                    </div>
-
-                    {/* 2. Type Dropdown */}
-                    <div className="relative w-full sm:w-auto sm:min-w-[140px]">
-                        <select
-                            className="block w-full px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white text-gray-700 focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 transition-all appearance-none"
-                            value={typeFilter}
-                            onChange={(e) => setTypeFilter(e.target.value)}
-                        >
-                            <option value="ALL">All Types</option>
-                            <option value="INVOICE">Invoices</option>
-                            <option value="QUOTATION">Quotes</option>
-                        </select>
-                        <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-500">
-                            <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path></svg>
+             <div className="flex flex-col gap-4">
+                 {/* Row 1: Search & Date Range */}
+                 <div className="grid grid-cols-1 md:grid-cols-12 gap-4">
+                    {/* Search */}
+                    <div className="md:col-span-6 lg:col-span-5 relative">
+                        <label className="block text-[10px] uppercase font-bold text-gray-400 mb-1 tracking-wide">Search</label>
+                        <div className="relative">
+                            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                <MagnifyingGlassIcon className="h-4 w-4 text-gray-400" />
+                            </div>
+                            <input
+                                type="text"
+                                placeholder="Client, email, invoice #..."
+                                className="block w-full pl-9 pr-3 py-2 border border-gray-200 rounded-lg text-sm bg-gray-50 focus:bg-white focus:ring-2 focus:ring-indigo-100 focus:border-indigo-500 outline-none transition-all"
+                                value={searchQuery}
+                                onChange={(e) => setSearchQuery(e.target.value)}
+                            />
                         </div>
                     </div>
 
-                    {/* 3. Status Dropdown */}
-                    <div className="relative w-full sm:w-auto sm:min-w-[140px]">
+                    {/* Date Range */}
+                    <div className="md:col-span-6 lg:col-span-4">
+                        <label className="block text-[10px] uppercase font-bold text-gray-400 mb-1 tracking-wide">Date Range</label>
+                        <div className="flex items-center gap-2">
+                            <div className="relative flex-1">
+                                <input
+                                    type="date"
+                                    className="block w-full px-3 py-2 border border-gray-200 rounded-lg text-sm bg-gray-50 focus:bg-white focus:ring-2 focus:ring-indigo-100 focus:border-indigo-500 outline-none transition-all text-gray-600"
+                                    value={dateRange.start}
+                                    onChange={(e) => setDateRange({ ...dateRange, start: e.target.value })}
+                                />
+                            </div>
+                            <span className="text-gray-400 text-sm font-medium">to</span>
+                            <div className="relative flex-1">
+                                <input
+                                    type="date"
+                                    className="block w-full px-3 py-2 border border-gray-200 rounded-lg text-sm bg-gray-50 focus:bg-white focus:ring-2 focus:ring-indigo-100 focus:border-indigo-500 outline-none transition-all text-gray-600"
+                                    value={dateRange.end}
+                                    onChange={(e) => setDateRange({ ...dateRange, end: e.target.value })}
+                                />
+                            </div>
+                        </div>
+                    </div>
+                 </div>
+
+                 {/* Row 2: Secondary Filters */}
+                 <div className="grid grid-cols-2 md:grid-cols-5 gap-4 pt-2">
+                    <div className="col-span-1">
+                        <label className="block text-[10px] uppercase font-bold text-gray-400 mb-1 tracking-wide">Status</label>
                         <select
-                            className="block w-full px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white text-gray-700 focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 transition-all appearance-none"
+                            className="block w-full px-3 py-2 border border-gray-200 rounded-lg text-sm bg-gray-50 focus:bg-white focus:ring-2 focus:ring-indigo-100 focus:border-indigo-500 outline-none cursor-pointer"
                             value={statusFilter}
                             onChange={(e) => setStatusFilter(e.target.value)}
                         >
@@ -387,18 +399,25 @@ const Dashboard: React.FC = () => {
                             <option value={PaymentStatus.OVERDUE}>Overdue</option>
                             <option value={PaymentStatus.FAILED}>Failed</option>
                         </select>
-                        <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-500">
-                            <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path></svg>
-                        </div>
                     </div>
 
-                    {/* 4. Place of Supply Filter */}
-                    <div className="relative w-full sm:w-auto sm:min-w-[160px]">
-                        <div className="absolute inset-y-0 left-0 pl-2 flex items-center pointer-events-none">
-                            <MapPinIcon className="h-4 w-4 text-gray-400" />
-                        </div>
+                    <div className="col-span-1">
+                        <label className="block text-[10px] uppercase font-bold text-gray-400 mb-1 tracking-wide">Type</label>
                         <select
-                            className="block w-full pl-8 pr-3 py-2 border border-gray-300 rounded-lg text-sm bg-white text-gray-700 focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 transition-all appearance-none"
+                            className="block w-full px-3 py-2 border border-gray-200 rounded-lg text-sm bg-gray-50 focus:bg-white focus:ring-2 focus:ring-indigo-100 focus:border-indigo-500 outline-none cursor-pointer"
+                            value={typeFilter}
+                            onChange={(e) => setTypeFilter(e.target.value)}
+                        >
+                            <option value="ALL">All Types</option>
+                            <option value="INVOICE">Invoice</option>
+                            <option value="QUOTATION">Quote</option>
+                        </select>
+                    </div>
+
+                    <div className="col-span-2 md:col-span-1">
+                        <label className="block text-[10px] uppercase font-bold text-gray-400 mb-1 tracking-wide">State</label>
+                        <select
+                            className="block w-full px-3 py-2 border border-gray-200 rounded-lg text-sm bg-gray-50 focus:bg-white focus:ring-2 focus:ring-indigo-100 focus:border-indigo-500 outline-none cursor-pointer truncate"
                             value={placeOfSupplyFilter}
                             onChange={(e) => setPlaceOfSupplyFilter(e.target.value)}
                         >
@@ -407,48 +426,23 @@ const Dashboard: React.FC = () => {
                         </select>
                     </div>
 
-                    {/* 5. Date Range */}
-                    <div className="flex gap-2 items-center w-full sm:w-auto sm:min-w-[300px]">
-                        <input
-                            type="date"
-                            className="block w-full border border-gray-300 rounded-lg text-sm p-2 text-gray-600 focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 transition-all"
-                            value={dateRange.start}
-                            onChange={(e) => setDateRange({ ...dateRange, start: e.target.value })}
-                            title="Start Date"
-                        />
-                        <span className="text-gray-400 text-sm">to</span>
-                        <input
-                            type="date"
-                            className="block w-full border border-gray-300 rounded-lg text-sm p-2 text-gray-600 focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 transition-all"
-                            value={dateRange.end}
-                            onChange={(e) => setDateRange({ ...dateRange, end: e.target.value })}
-                            title="End Date"
-                        />
-                    </div>
-                 </div>
-
-                 {/* Row 2: Resource Filters */}
-                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-3 border-t border-gray-200 border-dashed">
-                    <div className="relative">
-                        <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                            <ClipboardDocumentListIcon className="h-4 w-4 text-gray-400" />
-                        </div>
+                    <div className="col-span-1">
+                        <label className="block text-[10px] uppercase font-bold text-gray-400 mb-1 tracking-wide">Res. Section</label>
                         <input
                             type="text"
-                            placeholder="Filter by Resource Section"
-                            className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg text-sm bg-white placeholder-gray-400 focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 transition-all"
+                            placeholder="All"
+                            className="block w-full px-3 py-2 border border-gray-200 rounded-lg text-sm bg-gray-50 focus:bg-white focus:ring-2 focus:ring-indigo-100 focus:border-indigo-500 outline-none"
                             value={resourceSectionFilter}
                             onChange={(e) => setResourceSectionFilter(e.target.value)}
                         />
                     </div>
-                    <div className="relative">
-                        <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                            <TagIcon className="h-4 w-4 text-gray-400" />
-                        </div>
+
+                    <div className="col-span-1">
+                        <label className="block text-[10px] uppercase font-bold text-gray-400 mb-1 tracking-wide">Res. Name</label>
                         <input
                             type="text"
-                            placeholder="Filter by Resource Name"
-                            className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg text-sm bg-white placeholder-gray-400 focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 transition-all"
+                            placeholder="All"
+                            className="block w-full px-3 py-2 border border-gray-200 rounded-lg text-sm bg-gray-50 focus:bg-white focus:ring-2 focus:ring-indigo-100 focus:border-indigo-500 outline-none"
                             value={resourceNameFilter}
                             onChange={(e) => setResourceNameFilter(e.target.value)}
                         />
@@ -457,9 +451,9 @@ const Dashboard: React.FC = () => {
              </div>
           </div>
 
-          <div className="overflow-x-auto overflow-y-auto max-h-[400px]">
+          <div className="overflow-x-auto overflow-y-auto max-h-[500px]">
                 <table className="w-full text-left border-collapse">
-                   <thead className="bg-gray-50 text-xs uppercase font-medium text-gray-500 border-b border-gray-100 sticky top-0 z-10 shadow-sm">
+                   <thead className="bg-gray-50 text-xs uppercase font-medium text-gray-500 border-b border-gray-200 sticky top-0 z-10">
                       <tr>
                          <th className="px-6 py-4 bg-gray-50">Reference</th>
                          <th className="px-6 py-4 bg-gray-50">Invoice #</th>
@@ -481,21 +475,22 @@ const Dashboard: React.FC = () => {
                           </tr>
                       ) : sortedInvoices.length === 0 ? (
                           <tr>
-                              <td colSpan={7} className="px-6 py-8 text-center text-gray-500">
-                                  No documents found matching your filters.
+                              <td colSpan={7} className="px-6 py-12 text-center text-gray-500 flex flex-col items-center justify-center">
+                                  <DocumentTextIcon className="w-12 h-12 text-gray-300 mb-2" />
+                                  <p>No documents found matching your filters.</p>
                               </td>
                           </tr>
                       ) : sortedInvoices.map((inv) => (
-                          <tr key={inv.id} className="hover:bg-gray-50 transition-colors group cursor-pointer" onClick={() => navigate(`/view/${inv.id}`)}>
+                          <tr key={inv.id} className="hover:bg-gray-50 transition-colors group cursor-pointer border-b border-gray-100 last:border-0" onClick={() => navigate(`/view/${inv.id}`)}>
                               <td className="px-6 py-4">
                                   <div className="font-bold text-gray-700">{inv.invoiceNumber}</div>
                                   <div className="mt-1">{getTypeBadge(inv.type)}</div>
                               </td>
                               <td className="px-6 py-4 text-gray-600">
                                   {inv.paidInvoiceNumber ? (
-                                      <span className="font-mono text-indigo-700 font-bold bg-indigo-50 px-1 rounded">{inv.paidInvoiceNumber}</span>
+                                      <span className="font-mono text-indigo-700 font-bold bg-indigo-50 px-1.5 py-0.5 rounded text-xs">{inv.paidInvoiceNumber}</span>
                                   ) : (
-                                      <span className="text-gray-400">-</span>
+                                      <span className="text-gray-300">-</span>
                                   )}
                               </td>
                               <td className="px-6 py-4">
