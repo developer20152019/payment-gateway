@@ -2,11 +2,19 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { InvoiceData, LineItem, PaymentStatus, Product, DocumentType, Customer } from '../types';
-import { PlusIcon, TrashIcon, ChevronLeftIcon, UserPlusIcon, DocumentTextIcon } from '@heroicons/react/24/outline';
+import { PlusIcon, TrashIcon, ChevronLeftIcon, UserPlusIcon, DocumentTextIcon, BuildingOfficeIcon, UserIcon, MapPinIcon } from '@heroicons/react/24/outline';
 import { InvoiceService } from '../services/invoiceService';
 import { ProductService } from '../services/productService';
 import { CustomerService } from '../services/customerService';
 import { SettingsService } from '../services/settingsService';
+
+const INDIAN_STATES = [
+  "Andhra Pradesh", "Arunachal Pradesh", "Assam", "Bihar", "Chhattisgarh", "Goa", "Gujarat", "Haryana", 
+  "Himachal Pradesh", "Jharkhand", "Karnataka", "Kerala", "Madhya Pradesh", "Maharashtra", "Manipur", 
+  "Meghalaya", "Mizoram", "Nagaland", "Odisha", "Punjab", "Rajasthan", "Sikkim", "Tamil Nadu", "Telangana", 
+  "Tripura", "Uttar Pradesh", "Uttarakhand", "West Bengal", "Andaman and Nicobar Islands", "Chandigarh", 
+  "Dadra and Nagar Haveli and Daman and Diu", "Delhi", "Jammu and Kashmir", "Ladakh", "Lakshadweep", "Puducherry"
+];
 
 const generateInvoiceNumber = () => {
   const date = new Date();
@@ -205,38 +213,39 @@ const CreateInvoice: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <nav className="bg-white border-b border-gray-200 px-4 md:px-6 py-4 sticky top-0 z-20">
-        <div className="max-w-6xl mx-auto flex justify-between items-center">
+      <nav className="bg-white border-b border-gray-200 px-4 md:px-6 py-4 sticky top-0 z-20 shadow-sm">
+        <div className="max-w-7xl mx-auto flex justify-between items-center">
           <div className="flex items-center gap-4">
              <button onClick={() => navigate('/')} className="text-gray-500 hover:text-gray-800 transition-colors"><ChevronLeftIcon className="w-5 h-5" /></button>
              <h1 className="font-bold text-xl text-gray-900">{isEditMode ? 'Edit Document' : 'New Document'}</h1>
           </div>
           <div className="flex gap-3">
-             <button onClick={(e) => handleSubmit(e, 'QUOTATION')} disabled={isSaving} className="bg-white border border-gray-300 text-gray-700 px-4 py-2 rounded-lg font-medium text-sm hover:bg-gray-50">Send Quote</button>
-             <button onClick={(e) => handleSubmit(e, 'INVOICE')} disabled={isSaving} className="bg-indigo-600 text-white px-5 py-2 rounded-lg font-medium text-sm hover:bg-indigo-700 flex items-center gap-2 shadow-sm">{isSaving ? 'Saving...' : 'Send Invoice'}</button>
+             <button onClick={(e) => handleSubmit(e, 'QUOTATION')} disabled={isSaving} className="bg-white border border-gray-300 text-gray-700 px-4 py-2 rounded-lg font-medium text-sm hover:bg-gray-50 transition-colors">Send Quote</button>
+             <button onClick={(e) => handleSubmit(e, 'INVOICE')} disabled={isSaving} className="bg-indigo-600 text-white px-5 py-2 rounded-lg font-medium text-sm hover:bg-indigo-700 flex items-center gap-2 shadow-md shadow-indigo-100">{isSaving ? 'Saving...' : 'Send Invoice'}</button>
           </div>
         </div>
       </nav>
 
-      <div className="max-w-6xl mx-auto px-4 py-8">
+      <div className="max-w-7xl mx-auto px-4 py-8">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           
           <div className="lg:col-span-2 space-y-6">
-            {/* Header Information */}
+            
+            {/* 1. Header Information */}
             <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Invoice Number</label>
+                  <label className="block text-sm font-bold text-gray-400 uppercase mb-1">Invoice Number</label>
                   <input 
                     type="text" 
-                    className="w-full border border-gray-300 rounded-lg p-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none" 
+                    className="w-full border border-gray-300 rounded-lg p-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none font-mono" 
                     value={invoice.invoiceNumber} 
                     onChange={(e) => handleChange('invoiceNumber', e.target.value)} 
                   />
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Date</label>
+                    <label className="block text-sm font-bold text-gray-400 uppercase mb-1">Date</label>
                     <input 
                       type="date" 
                       className="w-full border border-gray-300 rounded-lg p-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none" 
@@ -245,7 +254,7 @@ const CreateInvoice: React.FC = () => {
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Due Date</label>
+                    <label className="block text-sm font-bold text-gray-400 uppercase mb-1">Due Date</label>
                     <input 
                       type="date" 
                       className="w-full border border-gray-300 rounded-lg p-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none" 
@@ -256,8 +265,8 @@ const CreateInvoice: React.FC = () => {
                 </div>
               </div>
 
-              {/* Dynamic Resource Selectors */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-6 pt-6 border-t border-gray-100">
+              {/* Resource Selectors */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-6 border-t border-gray-100">
                 <div>
                   <label className="block text-xs font-bold text-gray-400 uppercase mb-1">Resource Section</label>
                   <select 
@@ -295,19 +304,57 @@ const CreateInvoice: React.FC = () => {
               </div>
             </div>
 
-            {/* Client Information */}
+            {/* 2. Seller Details (Billed From) */}
             <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-              <div className="flex justify-between items-center mb-4">
-                <h2 className="text-sm font-bold text-gray-700 uppercase tracking-wider">Bill To (Client)</h2>
+              <h2 className="text-sm font-bold text-gray-700 uppercase tracking-wider mb-6 flex items-center gap-2">
+                <BuildingOfficeIcon className="w-5 h-5 text-gray-400" /> Billed From (Your Details)
+              </h2>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                 <div className="md:col-span-2">
+                    <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Business Name</label>
+                    <input type="text" className="w-full border border-gray-300 rounded-lg p-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none" value={invoice.businessName} onChange={(e) => handleChange('businessName', e.target.value)} placeholder="Acme Studio" />
+                 </div>
+                 <div>
+                    <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Seller Name</label>
+                    <input type="text" className="w-full border border-gray-300 rounded-lg p-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none" value={invoice.sellerName} onChange={(e) => handleChange('sellerName', e.target.value)} placeholder="John Doe" />
+                 </div>
+                 <div>
+                    <label className="block text-xs font-bold text-gray-500 uppercase mb-1">GSTIN</label>
+                    <input type="text" className="w-full border border-gray-300 rounded-lg p-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none" value={invoice.sellerGstin} onChange={(e) => handleChange('sellerGstin', e.target.value)} placeholder="Tax ID..." />
+                 </div>
+                 <div className="md:col-span-2">
+                    <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Address</label>
+                    <textarea rows={2} className="w-full border border-gray-300 rounded-lg p-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none resize-none" value={invoice.sellerAddress} onChange={(e) => handleChange('sellerAddress', e.target.value)} placeholder="Full address..." />
+                 </div>
+                 <div>
+                    <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Email</label>
+                    <input type="email" className="w-full border border-gray-300 rounded-lg p-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none" value={invoice.sellerEmail} onChange={(e) => handleChange('sellerEmail', e.target.value)} placeholder="support@acme.com" />
+                 </div>
+                 <div>
+                    <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Phone</label>
+                    <input type="tel" className="w-full border border-gray-300 rounded-lg p-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none" value={invoice.sellerPhone} onChange={(e) => handleChange('sellerPhone', e.target.value)} placeholder="+91..." />
+                 </div>
+              </div>
+            </div>
+
+            {/* 3. Client Details (Billed To) */}
+            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+              <div className="flex justify-between items-center mb-6">
+                <h2 className="text-sm font-bold text-gray-700 uppercase tracking-wider flex items-center gap-2">
+                  <UserIcon className="w-5 h-5 text-gray-400" /> Billed To (Client Details)
+                </h2>
                 <button onClick={() => navigate('/customers')} className="text-xs text-indigo-600 flex items-center gap-1 font-medium hover:underline">
                   <UserPlusIcon className="w-4 h-4" /> Manage Clients
                 </button>
               </div>
-              <div className="relative">
+
+              {/* Quick Search */}
+              <div className="relative mb-6 pb-6 border-b border-gray-100">
+                <label className="block text-[10px] font-bold text-indigo-500 uppercase mb-2">Quick Client Search</label>
                 <input 
                   type="text" 
-                  className="w-full border border-gray-300 rounded-lg p-2.5 text-sm font-medium focus:ring-2 focus:ring-indigo-500 outline-none" 
-                  placeholder="Search client name..." 
+                  className="w-full border border-indigo-200 bg-indigo-50/30 rounded-lg p-2.5 text-sm font-medium focus:ring-2 focus:ring-indigo-500 outline-none" 
+                  placeholder="Start typing client name to auto-fill..." 
                   value={invoice.buyerName} 
                   onChange={(e) => { handleChange('buyerName', e.target.value); setShowSuggestions(true); }} 
                   onFocus={() => setShowSuggestions(true)}
@@ -323,9 +370,48 @@ const CreateInvoice: React.FC = () => {
                   </div>
                 )}
               </div>
+
+              {/* Full Manual Client Form */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                 <div>
+                    <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Company Name</label>
+                    <input type="text" className="w-full border border-gray-300 rounded-lg p-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none" value={invoice.buyerName} onChange={(e) => handleChange('buyerName', e.target.value)} />
+                 </div>
+                 <div>
+                    <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Contact Person</label>
+                    <input type="text" className="w-full border border-gray-300 rounded-lg p-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none" value={invoice.buyerContactPerson} onChange={(e) => handleChange('buyerContactPerson', e.target.value)} placeholder="Attn: Name" />
+                 </div>
+                 <div>
+                    <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Email</label>
+                    <input type="email" className="w-full border border-gray-300 rounded-lg p-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none" value={invoice.buyerEmail} onChange={(e) => handleChange('buyerEmail', e.target.value)} />
+                 </div>
+                 <div>
+                    <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Phone</label>
+                    <input type="tel" className="w-full border border-gray-300 rounded-lg p-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none" value={invoice.buyerPhone} onChange={(e) => handleChange('buyerPhone', e.target.value)} />
+                 </div>
+                 <div className="md:col-span-2">
+                    <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Billing Address</label>
+                    <textarea rows={2} className="w-full border border-gray-300 rounded-lg p-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none resize-none" value={invoice.buyerAddress} onChange={(e) => handleChange('buyerAddress', e.target.value)} />
+                 </div>
+                 <div className="md:col-span-2">
+                    <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Shipping Address (Optional)</label>
+                    <textarea rows={2} className="w-full border border-gray-300 rounded-lg p-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none resize-none" value={invoice.buyerShippingAddress} onChange={(e) => handleChange('buyerShippingAddress', e.target.value)} />
+                 </div>
+                 <div>
+                    <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Place of Supply</label>
+                    <select className="w-full border border-gray-300 rounded-lg p-2 text-sm bg-white focus:ring-2 focus:ring-indigo-500 outline-none" value={invoice.placeOfSupply} onChange={(e) => handleChange('placeOfSupply', e.target.value)}>
+                        <option value="">Select State</option>
+                        {INDIAN_STATES.map(s => <option key={s} value={s}>{s}</option>)}
+                    </select>
+                 </div>
+                 <div>
+                    <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Pin Code</label>
+                    <input type="text" className="w-full border border-gray-300 rounded-lg p-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none" value={invoice.buyerPinCode} onChange={(e) => handleChange('buyerPinCode', e.target.value)} />
+                 </div>
+              </div>
             </div>
 
-            {/* Line Items */}
+            {/* 4. Line Items */}
             <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
               <h2 className="text-sm font-bold text-gray-700 uppercase tracking-wider mb-4">Line Items</h2>
               <div className="space-y-4">
@@ -333,36 +419,40 @@ const CreateInvoice: React.FC = () => {
                   <div key={item.id} className="p-4 border border-gray-100 rounded-lg bg-gray-50/30">
                     <div className="grid grid-cols-12 gap-4">
                       <div className="col-span-12 md:col-span-6">
+                        <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Item Description</label>
                         <input 
                           type="text" 
                           className="w-full bg-white border border-gray-300 rounded p-2 text-sm font-medium" 
-                          placeholder="Item Name"
+                          placeholder="What are you charging for?"
                           value={item.name} 
                           onChange={(e) => handleItemChange(item.id, 'name', e.target.value)} 
                         />
                       </div>
                       <div className="col-span-4 md:col-span-2">
+                        <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1 text-center">Qty</label>
                         <input 
                           type="number" 
                           className="w-full bg-white border border-gray-300 rounded p-2 text-sm text-center" 
-                          placeholder="Qty"
                           value={item.quantity} 
                           onChange={(e) => handleItemChange(item.id, 'quantity', e.target.value)} 
                         />
                       </div>
                       <div className="col-span-4 md:col-span-2">
+                        <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1 text-right">Rate</label>
                         <input 
                           type="number" 
                           className="w-full bg-white border border-gray-300 rounded p-2 text-sm text-right" 
-                          placeholder="Rate"
                           value={item.rate} 
                           onChange={(e) => handleItemChange(item.id, 'rate', e.target.value)} 
                         />
                       </div>
-                      <div className="col-span-4 md:col-span-2 flex items-center justify-between">
-                        <span className="text-sm font-bold text-gray-900">{item.amount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+                      <div className="col-span-4 md:col-span-2 flex items-end justify-between">
+                        <div className="flex-1 text-right pr-2">
+                           <span className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Amount</span>
+                           <span className="text-sm font-bold text-gray-900">{item.amount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+                        </div>
                         {invoice.items.length > 1 && (
-                          <button onClick={() => handleDeleteItem(item.id)} className="text-red-400 hover:text-red-600 transition-colors ml-2">
+                          <button onClick={() => handleDeleteItem(item.id)} className="text-red-400 hover:text-red-600 transition-colors mb-1">
                             <TrashIcon className="w-5 h-5" />
                           </button>
                         )}
@@ -370,7 +460,7 @@ const CreateInvoice: React.FC = () => {
                     </div>
                     <textarea 
                       className="w-full bg-transparent border-none text-xs text-gray-500 mt-2 resize-none focus:ring-0" 
-                      placeholder="Add description..." 
+                      placeholder="Additional details (optional)..." 
                       rows={1}
                       value={item.description} 
                       onChange={(e) => handleItemChange(item.id, 'description', e.target.value)} 
@@ -424,7 +514,7 @@ const CreateInvoice: React.FC = () => {
             </div>
 
             <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-              <label className="block text-xs font-bold text-gray-400 uppercase mb-2">Internal Notes / Terms</label>
+              <label className="block text-xs font-bold text-gray-400 uppercase mb-2">Terms & Conditions (Footer)</label>
               <textarea 
                 rows={4} 
                 className="w-full border border-gray-300 rounded-lg p-2 text-xs focus:ring-2 focus:ring-indigo-500 outline-none" 
