@@ -24,19 +24,19 @@ export const SettingsService = {
       if (!response.ok) throw new Error("Failed to load settings");
       const data = await response.json();
       
-      // If object is empty (MySQL returns no rows)
-      if (!data || Object.keys(data).length === 0) return null;
+      // Check if object is empty (no record found)
+      if (Object.keys(data).length === 0) return null;
 
-      // Normalize keys from MySQL (TitleCase) to Frontend (camelCase)
+      // Normalize keys
       return {
-        sellerName: data.SellerName !== undefined ? data.SellerName : (data.sellerName || ''),
-        businessName: data.BusinessName !== undefined ? data.BusinessName : (data.businessName || ''),
-        sellerAddress: data.SellerAddress !== undefined ? data.SellerAddress : (data.sellerAddress || ''),
-        sellerGstin: data.SellerGstin !== undefined ? data.SellerGstin : (data.sellerGstin || ''),
-        sellerEmail: data.SellerEmail !== undefined ? data.SellerEmail : (data.sellerEmail || ''),
-        sellerPhone: data.SellerPhone !== undefined ? data.SellerPhone : (data.sellerPhone || ''),
-        logoUrl: data.LogoUrl !== undefined ? data.LogoUrl : (data.logoUrl || ''),
-        brandColor: data.BrandColor !== undefined ? data.BrandColor : (data.brandColor || '#4f46e5')
+        sellerName: data.sellerName || data.SellerName,
+        businessName: data.businessName || data.BusinessName,
+        sellerAddress: data.sellerAddress || data.SellerAddress,
+        sellerGstin: data.sellerGstin || data.SellerGstin,
+        sellerEmail: data.sellerEmail || data.SellerEmail,
+        sellerPhone: data.sellerPhone || data.SellerPhone,
+        logoUrl: data.logoUrl || data.LogoUrl,
+        brandColor: data.brandColor || data.BrandColor || '#4f46e5'
       };
 
     } catch (e) {
@@ -53,10 +53,8 @@ export const SettingsService = {
         body: JSON.stringify(profile)
       });
       if (!response.ok) throw new Error("Backend Error");
-      // Sync local storage on success
-      LocalStorageSettingsService.saveSellerProfile(profile);
     } catch (e) {
-      console.warn("⚠️ Backend unavailable. Saving Settings to LocalStorage only.", e);
+      console.warn("⚠️ Backend unavailable. Saving Settings to LocalStorage.", e);
       LocalStorageSettingsService.saveSellerProfile(profile);
     }
   }

@@ -1,5 +1,4 @@
 import React, { useState } from 'react';
-// Fix: Ensure correct named export for useNavigate to resolve react-router-dom module errors
 import { useNavigate } from 'react-router-dom';
 import { LockClosedIcon, DocumentTextIcon } from '@heroicons/react/24/outline';
 
@@ -7,38 +6,17 @@ const Login: React.FC = () => {
   const navigate = useNavigate();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState('');
 
-  const handleLogin = async (e: React.FormEvent) => {
+  const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
-    setError('');
-    setIsSubmitting(true);
-
-    try {
-        const response = await fetch('/api/login', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ email, password })
-        });
-
-        const data = await response.json();
-
-        if (response.ok && data.success) {
-            // Store session flag
-            localStorage.setItem('isAuthenticated', 'true');
-            if (data.user) {
-                localStorage.setItem('user', JSON.stringify(data.user));
-            }
-            navigate('/');
-        } else {
-            setError(data.error || 'Invalid email or password.');
-        }
-    } catch (err) {
-        console.error('Login request failed:', err);
-        setError('Connection to server failed. Please check your network.');
-    } finally {
-        setIsSubmitting(false);
+    // Simple client-side auth for demonstration. 
+    // In a real app, verify against backend.
+    if (email === 'admin@paylink.com' && password === 'admin123') {
+        localStorage.setItem('isAuthenticated', 'true');
+        navigate('/');
+    } else {
+        setError('Invalid credentials.');
     }
   };
 
@@ -52,7 +30,7 @@ const Login: React.FC = () => {
           Sign in to Wappie Finance
         </h2>
         <p className="mt-2 text-center text-sm text-gray-600">
-          Secure dashboard access for administrators.
+          Or <a href="#" className="font-medium text-indigo-600 hover:text-indigo-500">contact support</a> for access.
         </p>
       </div>
 
@@ -73,7 +51,6 @@ const Login: React.FC = () => {
                   className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  disabled={isSubmitting}
                 />
               </div>
             </div>
@@ -92,37 +69,24 @@ const Login: React.FC = () => {
                   className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  disabled={isSubmitting}
                 />
               </div>
             </div>
 
             {error && (
-                <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-md text-sm font-medium animate-shake">
-                    {error}
-                </div>
+                <div className="text-red-600 text-sm font-medium">{error}</div>
             )}
 
             <div>
               <button
                 type="submit"
-                disabled={isSubmitting}
-                className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 gap-2 items-center disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 gap-2 items-center"
               >
-                {isSubmitting ? (
-                    <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
-                ) : (
-                    <LockClosedIcon className="w-4 h-4" />
-                )}
-                {isSubmitting ? 'Verifying...' : 'Sign in'}
+                <LockClosedIcon className="w-4 h-4" /> Sign in
               </button>
             </div>
           </form>
         </div>
-        
-        <p className="mt-6 text-center text-xs text-gray-400">
-            Forgot password? Please contact your system administrator.
-        </p>
       </div>
     </div>
   );

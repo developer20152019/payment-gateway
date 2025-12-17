@@ -1,6 +1,5 @@
 import React from 'react';
-// Fix: Correct named exports from react-router-dom and remove unused useLocation to resolve module errors
-import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { HashRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import CreateInvoice from './pages/CreateInvoice';
 import ViewInvoice from './pages/ViewInvoice';
 import Dashboard from './pages/Dashboard';

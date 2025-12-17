@@ -1,5 +1,4 @@
 import React, { useEffect, useState, useMemo } from 'react';
-// Fix: Ensure correct named export for useNavigate to resolve react-router-dom module errors
 import { useNavigate } from 'react-router-dom';
 import { InvoiceData, PaymentStatus, DocumentType } from '../types';
 import { InvoiceService } from '../services/invoiceService';
@@ -339,7 +338,7 @@ const Dashboard: React.FC = () => {
             <div className="w-8 h-8 bg-indigo-600 text-white rounded-lg flex items-center justify-center">
                 <DocumentTextIcon className="w-5 h-5" />
             </div>
-            <span className="text-gray-900">Wappie Finance</span>
+            <span className="text-gray-900">PayLink</span>
           </div>
           <div className="flex gap-2 sm:gap-3">
             <button

@@ -1,5 +1,4 @@
 import React, { useEffect, useState } from 'react';
-// Fix: Ensure correct named export for useNavigate to resolve react-router-dom module errors
 import { useNavigate } from 'react-router-dom';
 import { Product } from '../types';
 import { ProductService } from '../services/productService';
