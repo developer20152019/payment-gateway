@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+// Fix: Ensure correct named exports for useParams and useNavigate to resolve react-router-dom module errors
 import { useParams, useNavigate } from 'react-router-dom';
 import { InvoiceData, LineItem, PaymentStatus, Product, DocumentType, Customer } from '../types';
 import { PlusIcon, TrashIcon, ArrowPathIcon, ChevronLeftIcon, UserPlusIcon, XMarkIcon } from '@heroicons/react/24/outline';
@@ -16,19 +17,11 @@ const INDIAN_STATES = [
 ];
 
 const RESOURCE_SECTIONS = [
-    "Google",
-    "Facebook",
-    "Linkedin",
-    "Cold Calling",
-    "Website",
-    "Recharge",
-    "Reference"
+    "Google", "Facebook", "Linkedin", "Cold Calling", "Website", "Recharge", "Reference"
 ];
 
 const RESOURCE_NAMES = [
-  "Swapan Dutta", 
-  "Sharbhashish Nayak", 
-  "Dipraj Nath"
+  "Swapan Dutta", "Sharbhashish Nayak", "Dipraj Nath"
 ];
 
 const generateInvoiceNumber = () => {
@@ -179,17 +172,6 @@ const CreateInvoice: React.FC = () => {
   const handlePhoneChange = (section: keyof InvoiceData, value: string) => {
      const cleanValue = value.replace(/[^0-9+\-\s]/g, '');
      setInvoice({ ...invoice, [section]: cleanValue });
-  };
-
-  const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        handleChange('logoUrl', reader.result as string);
-      };
-      reader.readAsDataURL(file);
-    }
   };
 
   const recalculateTotals = (items: LineItem[]) => {

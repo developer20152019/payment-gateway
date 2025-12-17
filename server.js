@@ -7,6 +7,7 @@ import Razorpay from 'razorpay';
 import nodemailer from 'nodemailer';
 import path from 'path';
 import { fileURLToPath } from 'url';
+// Fix: Import GoogleGenAI as per coding guidelines
 import { GoogleGenAI } from "@google/genai";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -33,9 +34,6 @@ const dbConfig = {
 };
 
 const pool = mysql.createPool(dbConfig);
-
-// --- AI Initialization ---
-const getAI = () => new GoogleGenAI({ apiKey: process.env.API_KEY });
 
 // --- Helpers ---
 async function generatePaidInvoiceNumber() {
@@ -67,28 +65,6 @@ function toMysqlDateTime(isoString) {
 
 // --- API Routes ---
 
-// Gemini AI Summary (Used if needed in other pages, removed from ViewInvoice)
-app.post('/api/ai/summarize', async (req, res) => {
-    const { invoiceData } = req.body;
-    try {
-        const ai = getAI();
-        const prompt = `Act as a professional financial assistant for ${invoiceData.businessName}. 
-        Write a short, polite, and friendly 2-sentence summary note for a customer named ${invoiceData.buyerName} 
-        regarding their ${invoiceData.type.toLowerCase()} #${invoiceData.invoiceNumber} for a total of ${invoiceData.total} ${invoiceData.currency}. 
-        Mention the items: ${invoiceData.items.map(i => i.name).join(', ')}. No markdown.`;
-
-        const response = await ai.models.generateContent({
-            model: 'gemini-3-flash-preview',
-            contents: prompt,
-        });
-
-        res.json({ text: response.text });
-    } catch (err) {
-        console.error('Gemini AI Error:', err);
-        res.status(500).json({ error: 'AI generation failed' });
-    }
-});
-
 // Authentication
 app.post('/api/login', async (req, res) => {
     const { email, password } = req.body;
@@ -116,7 +92,7 @@ app.post('/api/products', async (req, res) => {
     res.json({ success: true });
 });
 
-// Customers - FIXED: Included PlaceOfSupply and PinCode in SELECT and correctly mapped UPDATE
+// Customers
 app.get('/api/customers', async (req, res) => {
     const [rows] = await pool.query('SELECT ID as id, Name as name, Email as email, Phone as phone, Address as address, Gstin as gstin, PlaceOfSupply as placeOfSupply, PinCode as pinCode FROM Customers');
     res.json(rows);
@@ -228,52 +204,66 @@ app.post('/api/invoices', async (req, res) => {
     }
 });
 
-// Notifications (Email & WhatsApp Mock)
+// Notifications
 app.post('/api/notify', async (req, res) => {
     const { to, subject, body, attachments } = req.body;
-    console.log(`Email notification request to: ${to}, Subject: ${subject}`);
-    
-    // Stub for Nodemailer if configured
     if (process.env.SMTP_HOST) {
         try {
             const transporter = nodemailer.createTransport({
                 host: process.env.SMTP_HOST,
                 port: process.env.SMTP_PORT,
                 secure: process.env.SMTP_SECURE === 'true',
-                auth: {
-                    user: process.env.SMTP_USER,
-                    pass: process.env.SMTP_PASS
-                }
+                auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS }
             });
-            await transporter.sendMail({
-                from: process.env.SMTP_FROM || '"Wappie Finance" <no-reply@wappie.in>',
-                to, subject, html: body, attachments
-            });
-            return res.json({ success: true, message: 'Email sent' });
+            await transporter.sendMail({ from: process.env.SMTP_FROM, to, subject, html: body, attachments });
+            return res.json({ success: true });
         } catch (e) {
-            console.error('SMTP Error:', e);
             return res.status(500).json({ error: 'SMTP failed' });
         }
     }
-    
-    res.json({ success: true, message: 'Notification received (Mock mode - no SMTP configured)' });
+    res.json({ success: true, mock: true });
 });
 
 app.post('/api/whatsapp/send', (req, res) => {
-    console.log(`WhatsApp request for: ${req.body.to}`);
-    res.json({ success: true, message: 'WhatsApp mock sent' });
+    res.json({ success: true, mock: true });
 });
 
-// --- Static Frontend Serving (Production Only) ---
+// Fix: Implement AI summarize endpoint using Gemini as per instructions
+app.post('/api/ai/summarize', async (req, res) => {
+    const { invoiceData } = req.body;
+    if (!process.env.API_KEY) {
+        return res.status(500).json({ error: "Gemini API Key is not configured." });
+    }
+
+    try {
+        const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+        const response = await ai.models.generateContent({
+            model: 'gemini-3-flash-preview',
+            contents: `Please summarize the following invoice data for the customer in a professional and friendly tone. 
+            Highlight the total amount due, the due date, and the items being billed.
+            
+            Invoice Details:
+            - Invoice Ref: ${invoiceData.invoiceNumber}
+            - Date: ${invoiceData.date}
+            - Due Date: ${invoiceData.dueDate}
+            - Total Amount: ${invoiceData.total} ${invoiceData.currency}
+            - Items: ${invoiceData.items.map(i => `${i.name} (${i.quantity} x ${i.rate})`).join(', ')}
+            
+            Keep the summary concise and focused on what the customer needs to know.`
+        });
+
+        res.json({ text: response.text });
+    } catch (err) {
+        console.error("Gemini Summarize Error:", err);
+        res.status(500).json({ error: "Failed to generate AI summary." });
+    }
+});
+
 const distPath = path.join(__dirname, 'dist');
 app.use(express.static(distPath));
-
 app.get('*', (req, res) => {
-    if (!req.path.startsWith('/api')) {
-        res.sendFile(path.join(distPath, 'index.html'));
-    } else {
-        res.status(404).json({ error: 'API route not found' });
-    }
+    if (!req.path.startsWith('/api')) res.sendFile(path.join(distPath, 'index.html'));
+    else res.status(404).json({ error: 'API route not found' });
 });
 
 app.listen(PORT, () => {

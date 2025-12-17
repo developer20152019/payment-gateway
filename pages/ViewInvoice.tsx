@@ -1,16 +1,19 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+// Fix: Ensure correct named exports for useParams, useNavigate, and useLocation to resolve react-router-dom module errors
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { InvoiceData, PaymentStatus } from '../types';
 import { InvoicePreview } from '../components/InvoicePreview';
-import { ShieldCheckIcon, ShareIcon, ArrowDownTrayIcon } from '@heroicons/react/24/outline';
+import { ShieldCheckIcon, ShareIcon, ArrowDownTrayIcon, ChatBubbleLeftRightIcon, EnvelopeIcon } from '@heroicons/react/24/outline';
 import { InvoiceService } from '../services/invoiceService';
 
 const ViewInvoice: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
   const [invoice, setInvoice] = useState<InvoiceData | null>(null);
   const [isDownloading, setIsDownloading] = useState(false);
   const [notification, setNotification] = useState<{message: string, type: string} | null>(null);
+  const [isNotifying, setIsNotifying] = useState(false);
 
   const fetchInvoice = useCallback(async () => {
     if (id) {
@@ -23,6 +26,32 @@ const ViewInvoice: React.FC = () => {
   useEffect(() => {
     fetchInvoice();
   }, [fetchInvoice]);
+
+  // Handle automatic notifications when coming from Create/Edit page
+  useEffect(() => {
+    if (invoice && location.state?.autoSendEmail && !isNotifying) {
+        handleSendNotifications();
+        // Clear state to avoid re-triggering on refresh
+        window.history.replaceState({}, document.title);
+    }
+  }, [invoice, location.state]);
+
+  const handleSendNotifications = async () => {
+    if (!invoice) return;
+    setIsNotifying(true);
+    try {
+        await Promise.all([
+            InvoiceService.sendEmailNotification(invoice, 'CREATED'),
+            InvoiceService.sendWhatsAppNotification(invoice, 'CREATED')
+        ]);
+        setNotification({ message: 'Notifications sent to client!', type: 'success' });
+    } catch (e) {
+        setNotification({ message: 'Failed to send some notifications', type: 'error' });
+    } finally {
+        setIsNotifying(false);
+        setTimeout(() => setNotification(null), 3000);
+    }
+  };
 
   const handleCopyLink = () => {
     navigator.clipboard.writeText(window.location.href);
@@ -50,7 +79,7 @@ const ViewInvoice: React.FC = () => {
   return (
     <div className="min-h-screen bg-gray-50 pb-20">
       {notification && (
-        <div className="fixed top-5 left-1/2 -translate-x-1/2 z-[100] bg-gray-900 text-white px-6 py-3 rounded-full shadow-2xl animate-bounce-in">
+        <div className={`fixed top-5 left-1/2 -translate-x-1/2 z-[100] px-6 py-3 rounded-full shadow-2xl animate-bounce-in text-white ${notification.type === 'error' ? 'bg-red-600' : 'bg-gray-900'}`}>
           {notification.message}
         </div>
       )}
@@ -80,26 +109,49 @@ const ViewInvoice: React.FC = () => {
           </div>
 
           <div className="w-full md:w-80 shrink-0 no-print">
-             <div className="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm sticky top-24">
-                <h3 className="font-bold text-gray-900 mb-4">Document Details</h3>
-                <div className="space-y-4 text-sm">
-                   <div className="flex justify-between">
-                      <span className="text-gray-500">Status</span>
-                      <span className={`font-bold ${invoice.status === PaymentStatus.PAID ? 'text-green-600' : 'text-amber-600'}`}>{invoice.status}</span>
-                   </div>
-                   <div className="flex justify-between">
-                      <span className="text-gray-500">Type</span>
-                      <span className="font-medium text-gray-900">{invoice.type}</span>
-                   </div>
-                   <div className="pt-4 border-t border-gray-100">
-                      <p className="text-xs text-gray-400 mb-1 uppercase font-bold tracking-wider">Payable Amount</p>
-                      <p className="text-3xl font-black text-gray-900">{new Intl.NumberFormat('en-IN', { style: 'currency', currency: invoice.currency }).format(invoice.total)}</p>
-                   </div>
-                   {invoice.status !== PaymentStatus.PAID && (
-                      <button onClick={() => alert('Payment sequence started')} className="w-full bg-indigo-600 text-white py-4 rounded-xl font-bold text-lg hover:bg-indigo-700 transition-all shadow-xl shadow-indigo-100 flex items-center justify-center gap-2">
-                         <ShieldCheckIcon className="w-6 h-6" /> Pay Securely
-                      </button>
-                   )}
+             <div className="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm sticky top-24 space-y-6">
+                <div>
+                    <h3 className="font-bold text-gray-900 mb-4">Document Details</h3>
+                    <div className="space-y-4 text-sm">
+                    <div className="flex justify-between">
+                        <span className="text-gray-500">Status</span>
+                        <span className={`font-bold ${invoice.status === PaymentStatus.PAID ? 'text-green-600' : 'text-amber-600'}`}>{invoice.status}</span>
+                    </div>
+                    <div className="flex justify-between">
+                        <span className="text-gray-500">Type</span>
+                        <span className="font-medium text-gray-900">{invoice.type}</span>
+                    </div>
+                    <div className="pt-4 border-t border-gray-100">
+                        <p className="text-xs text-gray-400 mb-1 uppercase font-bold tracking-wider">Payable Amount</p>
+                        <p className="text-3xl font-black text-gray-900">{new Intl.NumberFormat('en-IN', { style: 'currency', currency: invoice.currency }).format(invoice.total)}</p>
+                    </div>
+                    {invoice.status !== PaymentStatus.PAID && (
+                        <button onClick={() => alert('Payment sequence started')} className="w-full bg-indigo-600 text-white py-4 rounded-xl font-bold text-lg hover:bg-indigo-700 transition-all shadow-xl shadow-indigo-100 flex items-center justify-center gap-2">
+                            <ShieldCheckIcon className="w-6 h-6" /> Pay Securely
+                        </button>
+                    )}
+                    </div>
+                </div>
+
+                <div className="pt-6 border-t border-gray-100">
+                    <h4 className="text-xs font-bold text-gray-400 uppercase mb-4 tracking-widest">Quick Actions</h4>
+                    <div className="grid grid-cols-1 gap-3">
+                        <button 
+                            onClick={handleSendNotifications} 
+                            disabled={isNotifying}
+                            className="flex items-center gap-3 w-full p-3 rounded-xl border border-gray-100 hover:bg-gray-50 transition-colors text-sm font-medium text-gray-700 disabled:opacity-50"
+                        >
+                            <EnvelopeIcon className="w-5 h-5 text-indigo-500" />
+                            Resend Notifications
+                        </button>
+                        <button 
+                            onClick={() => window.open(`https://wa.me/${invoice.buyerPhone?.replace(/\D/g, '')}?text=Hello ${invoice.buyerName}, your ${invoice.type.toLowerCase()} ${invoice.invoiceNumber} is ready: ${window.location.href}`, '_blank')}
+                            className="flex items-center gap-3 w-full p-3 rounded-xl border border-gray-100 hover:bg-gray-50 transition-colors text-sm font-medium text-gray-700"
+                        >
+                            <ChatBubbleLeftRightIcon className="w-5 h-5 text-green-500" />
+                            Direct WhatsApp
+                        </button>
+                    </div>
                 </div>
              </div>
           </div>
