@@ -1,5 +1,5 @@
 {
   "name": "PayLink - Modern Invoice Generator",
-  "description": "A production-ready invoice generator with CCAvenue integration, shareable links, and AI-powered description generation.",
+  "description": "A production-ready invoice generator with CCAvenue & Razorpay integration and shareable payment links.",
   "requestFramePermissions": []
 }
