@@ -3,22 +3,41 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>PayLink Invoice</title>
+    <title>PayLink - Modern Finance</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <!-- Client-side PDF generation library -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
     <!-- jQuery for CCAvenue Kit Compatibility -->
     <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.10.2/jquery.min.js"></script>
     <style>
-      body { font-family: 'Inter', sans-serif; background-color: #f3f4f6; }
-      .invoice-shadow { box-shadow: 0 4px 24px rgba(0,0,0,0.06); }
-      /* Print styles */
+      body { 
+        font-family: 'Plus Jakarta Sans', sans-serif; 
+        background-color: #f8fafc; 
+        color: #0f172a;
+      }
+      .glass-card {
+        background: rgba(255, 255, 255, 0.8);
+        backdrop-filter: blur(12px);
+        -webkit-backdrop-filter: blur(12px);
+        border: 1px solid rgba(255, 255, 255, 0.3);
+      }
+      .premium-shadow {
+        box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.02), 0 4px 6px -4px rgba(0, 0, 0, 0.02), 0 25px 50px -12px rgba(0, 0, 0, 0.04);
+      }
+      .indigo-gradient {
+        background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
+      }
       @media print {
         .no-print { display: none !important; }
         body { background-color: white; }
         .invoice-container { box-shadow: none; border: none; padding: 0; }
       }
+      /* Custom Scrollbar */
+      ::-webkit-scrollbar { width: 6px; height: 6px; }
+      ::-webkit-scrollbar-track { background: #f1f5f9; }
+      ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
+      ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
     </style>
   <script type="importmap">
 {
@@ -30,7 +49,8 @@
     "@heroicons/react/": "https://esm.sh/@heroicons/react@^2.2.0/",
     "vite": "https://esm.sh/vite@^7.2.7",
     "@vitejs/plugin-react": "https://esm.sh/@vitejs/plugin-react@^5.1.2",
-    "@google/genai": "https://esm.sh/@google/genai@^1.33.0"
+    "@google/genai": "https://esm.sh/@google/genai@^1.33.0",
+    "react-router": "https://esm.sh/react-router@^7.11.0"
   }
 }
 </script>

@@ -1,5 +1,7 @@
+
 import React, { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+// Changed import from 'react-router-dom' to 'react-router' to fix v7 export errors
+import { useNavigate } from 'react-router';
 import { Customer } from '../types';
 import { CustomerService } from '../services/customerService';
 import { ChevronLeftIcon, PlusIcon, TrashIcon, UsersIcon, PencilIcon, XMarkIcon, CheckIcon } from '@heroicons/react/24/outline';
