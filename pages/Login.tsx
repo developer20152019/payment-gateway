@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { LockClosedIcon, DocumentTextIcon } from '@heroicons/react/24/outline';
@@ -8,33 +7,16 @@ const Login: React.FC = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
-  const [loading, setLoading] = useState(false);
 
-  const handleLogin = async (e: React.FormEvent) => {
+  const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
-    setLoading(true);
-    setError('');
-
-    try {
-        const response = await fetch('/api/auth/login', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ email, password })
-        });
-
-        const data = await response.json();
-
-        if (response.ok && data.success) {
-            localStorage.setItem('isAuthenticated', 'true');
-            localStorage.setItem('user', JSON.stringify(data.user));
-            navigate('/');
-        } else {
-            setError(data.error || 'Invalid credentials.');
-        }
-    } catch (err) {
-        setError('Connection to server failed.');
-    } finally {
-        setLoading(false);
+    // Simple client-side auth for demonstration. 
+    // In a real app, verify against backend.
+    if (email === 'admin@paylink.com' && password === 'admin123') {
+        localStorage.setItem('isAuthenticated', 'true');
+        navigate('/');
+    } else {
+        setError('Invalid credentials.');
     }
   };
 
@@ -98,10 +80,9 @@ const Login: React.FC = () => {
             <div>
               <button
                 type="submit"
-                disabled={loading}
-                className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 gap-2 items-center disabled:opacity-50"
+                className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 gap-2 items-center"
               >
-                {loading ? 'Signing in...' : <><LockClosedIcon className="w-4 h-4" /> Sign in</>}
+                <LockClosedIcon className="w-4 h-4" /> Sign in
               </button>
             </div>
           </form>

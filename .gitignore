@@ -83,4 +83,4 @@ typings/
 .vscode/
 
 # PayLink specifics
-# dist/  <-- COMMENTED OUT TO ALLOW UPLOADING BUILD
+dist/
