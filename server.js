@@ -78,7 +78,7 @@ function toMysqlDateTime(isoString) {
 
 // --- API Routes ---
 
-// Health Check (Very important for verifying proxy)
+// Health Check
 app.get('/api/health', (req, res) => {
     res.json({ status: 'ok', serverTime: new Date().toISOString(), port: PORT });
 });
@@ -88,9 +88,17 @@ app.post('/api/login', async (req, res) => {
     const { email, password } = req.body;
     console.log(`[AUTH] Login attempt for: ${email}`);
     try {
-        const [rows] = await pool.query('SELECT Email, Name FROM Users WHERE Email = ? AND Password = ?', [email, password]);
+        // Fix: Use SELECT * to prevent crashing if the 'Name' column is missing from older setups
+        const [rows] = await pool.query('SELECT * FROM Users WHERE Email = ? AND Password = ?', [email, password]);
         if (rows.length > 0) {
-            return res.json({ success: true, user: rows[0] });
+            const user = rows[0];
+            return res.json({ 
+                success: true, 
+                user: { 
+                    Email: user.Email, 
+                    Name: user.Name || 'Administrator' 
+                } 
+            });
         } else {
             return res.status(401).json({ success: false, error: 'Invalid email or password' });
         }
@@ -209,80 +217,4 @@ app.get('/api/invoices/:id', async (req, res) => {
         const [invoices] = await pool.query('SELECT * FROM Invoices WHERE ID = ?', [req.params.id]);
         if (invoices.length === 0) return res.status(404).json({ error: 'Not found' });
         const invoice = invoices[0];
-        const [items] = await pool.query(`SELECT ID as id, ItemName as name, Description as description, Quantity as quantity, Rate as rate, Amount as amount FROM LineItems WHERE InvoiceID = ?`, [invoice.ID]);
-        invoice.items = items;
-        res.json(invoice);
-    } catch (err) {
-        res.status(500).json({ error: err.message });
-    }
-});
-
-app.post('/api/invoices', async (req, res) => {
-    const inv = req.body;
-    const connection = await pool.getConnection();
-    if (inv.status === 'PAID' && (!inv.paidInvoiceNumber || inv.paidInvoiceNumber === '')) {
-        inv.paidInvoiceNumber = await generatePaidInvoiceNumber();
-    }
-    const sqlDate = toMysqlDateTime(inv.date);
-    const sqlDueDate = toMysqlDateTime(inv.dueDate);
-    try {
-        await connection.beginTransaction();
-        await connection.query(`
-            INSERT INTO Invoices 
-            (ID, InvoiceNumber, PaidInvoiceNumber, Type, Date, DueDate, Template, BrandColor, LogoUrl, SellerName, BusinessName, SellerAddress, 
-            SellerGstin, SellerEmail, SellerPhone, BuyerName, BuyerContactPerson, BuyerEmail, BuyerPhone, BuyerAddress, BuyerShippingAddress, PlaceOfSupply, BuyerPinCode,
-            ResourceSection, ResourceName, Subtotal, TaxRate, TaxAmount, Total, Currency, Status, PaymentGateway, Notes)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            ON DUPLICATE KEY UPDATE
-            InvoiceNumber=?, PaidInvoiceNumber=?, Type=?, Date=?, DueDate=?, Template=?, BrandColor=?, LogoUrl=?, SellerName=?, BusinessName=?, SellerAddress=?,
-            SellerGstin=?, SellerEmail=?, SellerPhone=?, BuyerName=?, BuyerContactPerson=?, BuyerEmail=?, BuyerPhone=?, BuyerAddress=?, BuyerShippingAddress=?, PlaceOfSupply=?, BuyerPinCode=?,
-            ResourceSection=?, ResourceName=?, Subtotal=?, TaxRate=?, TaxAmount=?, Total=?, Currency=?, Status=?, PaymentGateway=?, Notes=?
-        `, [
-            inv.id, inv.invoiceNumber, inv.paidInvoiceNumber, inv.type, sqlDate, sqlDueDate, inv.template, inv.brandColor, inv.logoUrl, inv.sellerName, inv.businessName, inv.sellerAddress,
-            inv.sellerGstin, inv.sellerEmail, inv.sellerPhone, inv.buyerName, inv.buyerContactPerson, inv.buyerEmail, inv.buyerPhone, inv.buyerAddress, inv.buyerShippingAddress, inv.placeOfSupply, inv.buyerPinCode,
-            inv.resourceSection, inv.resourceName, inv.subtotal, inv.taxRate, inv.taxAmount, inv.total, inv.currency, inv.status, inv.paymentGateway, inv.notes,
-            inv.invoiceNumber, inv.paidInvoiceNumber, inv.type, sqlDate, sqlDueDate, inv.template, inv.brandColor, inv.logoUrl, inv.sellerName, inv.businessName, inv.sellerAddress,
-            inv.sellerGstin, inv.sellerEmail, inv.sellerPhone, inv.buyerName, inv.buyerContactPerson, inv.buyerEmail, inv.buyerPhone, inv.buyerAddress, inv.buyerShippingAddress, inv.placeOfSupply, inv.buyerPinCode,
-            inv.resourceSection, inv.resourceName, inv.subtotal, inv.taxRate, inv.taxAmount, inv.total, inv.currency, inv.status, inv.paymentGateway, inv.notes
-        ]);
-        await connection.query('DELETE FROM LineItems WHERE InvoiceID = ?', [inv.id]);
-        if (inv.items && inv.items.length > 0) {
-            const itemValues = inv.items.map((item, index) => [`li_${Date.now()}_${index}`, inv.id, item.name, item.description, item.quantity, item.rate, item.amount]);
-            await connection.query('INSERT INTO LineItems (ID, InvoiceID, ItemName, Description, Quantity, Rate, Amount) VALUES ?', [itemValues]);
-        }
-        await connection.commit();
-        res.json({ success: true, id: inv.id, paidInvoiceNumber: inv.paidInvoiceNumber });
-    } catch (err) {
-        await connection.rollback();
-        res.status(500).json({ error: err.message });
-    } finally {
-        connection.release();
-    }
-});
-
-app.delete('/api/invoices/:id', async (req, res) => {
-    try {
-        await pool.query('DELETE FROM Invoices WHERE ID = ?', [req.params.id]);
-        res.json({ success: true });
-    } catch (err) {
-        res.status(500).json({ error: err.message });
-    }
-});
-
-// Final catch-all for /api routes to ensure JSON is returned for 404s
-app.use('/api/*', (req, res) => {
-    console.log(`[404] No route matched for: ${req.method} ${req.originalUrl}`);
-    res.status(404).json({ error: `API route ${req.originalUrl} not found` });
-});
-
-// Start Server
-const server = app.listen(PORT, '0.0.0.0', () => {
-    console.log(`🚀 [SERVER] Backend running at http://localhost:${PORT}`);
-    console.log(`   [SERVER] API listening at http://localhost:${PORT}/api`);
-});
-
-server.on('error', (e) => {
-    if (e.code === 'EADDRINUSE') {
-        console.error(`❌ [SERVER] Port ${PORT} is already in use. Please close other instances.`);
-    }
-});
+        const [items] = await pool.query(`SELECT ID as id, ItemName
