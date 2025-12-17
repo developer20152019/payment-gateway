@@ -52,7 +52,7 @@ async function generatePaidInvoiceNumber() {
         return `INV-${nextNum.toString().padStart(5, '0')}`;
     } catch (e) {
         console.error("Error generating invoice number:", e);
-        return `INV-${Date.now()}`; // Fallback
+        return `EST-${Date.now()}`; // Fallback
     }
 }
 
