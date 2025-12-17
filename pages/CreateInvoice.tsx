@@ -1,6 +1,7 @@
-
 import React, { useEffect, useState } from 'react';
-import { useParams, useNavigate } from 'react-router';
+// Fix: Use a module-level import to avoid named export type errors in the current environment
+import * as ReactRouterDOM from 'react-router-dom';
+const { useParams, useNavigate } = ReactRouterDOM as any;
 import { InvoiceData, LineItem, PaymentStatus, Product, DocumentType, Customer } from '../types';
 import { 
     PlusIcon, TrashIcon, DocumentTextIcon, ArrowPathIcon, 
@@ -35,7 +36,8 @@ const getInitialInvoice = (): InvoiceData => ({
 });
 
 const CreateInvoice: React.FC = () => {
-  const { id } = useParams<{ id: string }>();
+  // Fix: useParams is untyped when imported via 'as any', remove type parameters
+  const { id } = useParams();
   const navigate = useNavigate();
   
   const [invoice, setInvoice] = useState<InvoiceData>(getInitialInvoice);
@@ -236,7 +238,6 @@ const CreateInvoice: React.FC = () => {
             <div className="sticky top-24 rounded-3xl bg-slate-900 p-8 text-white premium-shadow">
                 <div className="mb-8 flex items-center gap-3">
                     <div className="h-10 w-10 flex items-center justify-center rounded-xl bg-white/10">
-                        {/* Fix: Added missing icon import */}
                         <BanknotesIcon className="h-6 w-6" />
                     </div>
                     <h2 className="text-lg font-bold">Billing Summary</h2>
