@@ -12,7 +12,7 @@ const INDIAN_STATES = [
   "Dadra and Nagar Haveli and Daman and Diu", "Delhi", "Jammu and Kashmir", "Ladakh", "Lakshadweep", "Puducherry"
 ];
 
-// Helper to format date to IST
+// Helper to format date to IST with time
 const formatDateToIST = (dateString: string) => {
   if (!dateString) return '-';
   try {
@@ -20,11 +20,14 @@ const formatDateToIST = (dateString: string) => {
     // Check if date is valid
     if (isNaN(date.getTime())) return dateString;
     
-    return date.toLocaleDateString('en-IN', {
+    return date.toLocaleString('en-IN', {
       timeZone: 'Asia/Kolkata',
       day: '2-digit',
       month: '2-digit',
-      year: 'numeric'
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: true
     });
   } catch (e) {
     return dateString;
