@@ -520,13 +520,15 @@ const Dashboard: React.FC = () => {
                                           {copiedId === inv.id ? <CheckIcon className="w-5 h-5 text-green-600" /> : <LinkIcon className="w-5 h-5" />}
                                       </button>
                                       
-                                      <button 
-                                          onClick={(e) => handleEdit(e, inv.id)}
-                                          className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors"
-                                          title="Edit"
-                                      >
-                                          <PencilIcon className="w-5 h-5" />
-                                      </button>
+                                      {inv.status !== PaymentStatus.PAID && (
+                                          <button 
+                                              onClick={(e) => handleEdit(e, inv.id)}
+                                              className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors"
+                                              title="Edit"
+                                          >
+                                              <PencilIcon className="w-5 h-5" />
+                                          </button>
+                                      )}
 
                                       {inv.type === 'INVOICE' && inv.status !== PaymentStatus.PAID && (
                                           <button 
