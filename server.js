@@ -390,7 +390,7 @@ app.post('/api/whatsapp/send', async (req, res) => {
     }
 
     const apiKey = process.env.YCLOUD_API_KEY ; // Use env or fallback provided
-    const fromNumber = '+918310342294';
+    const fromNumber = process.env.FROMNUMBER;
 
     if (!apiKey) {
         console.warn("⚠️ YCloud API Key missing in .env (YCLOUD_API_KEY)");

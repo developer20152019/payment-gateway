@@ -118,11 +118,13 @@ const formatDateDDMMYYYY = (isoDate: string) => {
 const generateEmailContent = (invoice: InvoiceData, link: string, type: 'CREATED' | 'PAID') => {
     const isQuote = invoice.type === 'QUOTATION';
     const docType = isQuote ? 'Estimate' : 'Invoice';
+    const docTypeCaps = docType.toUpperCase();
     // Use PaidInvoiceNumber for the final invoice ref if paid, otherwise the current number
     const finalNumber = invoice.paidInvoiceNumber || invoice.invoiceNumber;
-    const refNumber = invoice.invoiceNumber; // The original ref/estimate number
+    const refNumber = invoice.invoiceNumber; 
     
     if (type === 'PAID') {
+        // --- PAYMENT RECEIPT TEMPLATE (Plain Text style) ---
         const subject = `Invoice ${finalNumber} for ${docType} ${refNumber}`;
         const body = `
             <div style="font-family: Arial, sans-serif; color: #333; line-height: 1.6;">
@@ -135,27 +137,54 @@ const generateEmailContent = (invoice: InvoiceData, link: string, type: 'CREATED
                 <p><strong>Happy Messaging</strong></p>
                 <p>Warm regards,<br/>
                 ${invoice.businessName}<br/>
-                ${invoice.sellerEmail ? `📧 ${invoice.sellerEmail}<br/>` : ''}
-                ${invoice.sellerPhone ? `📱 ${invoice.sellerPhone}` : ''}
+                📧 support@wappie.in<br/>
+                🌐 www.wappie.in
                 </p>
             </div>
         `;
         return { subject, body };
     } else {
-        // CREATED (Default)
+        // --- CREATION TEMPLATE (Card Layout) ---
         const subject = `${docType} #${refNumber} from ${invoice.businessName}`;
+        const amountFormatted = new Intl.NumberFormat('en-IN', { style: 'currency', currency: invoice.currency }).format(invoice.total);
+        const dateFormatted = formatDateDDMMYYYY(invoice.date);
+
         const body = `
             <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; background-color: #ffffff; color: #333;">
                 <p>Dear <strong>"${invoice.buyerName}"</strong>,</p>
                 <p>Thank you for contacting us. Your ${docType.toLowerCase()} can be paid, viewed, printed and downloaded as PDF from the link below.</p>
                 
-                <div style="margin: 30px 0; text-align: center;">
-                    <a href="${link}" style="background-color: #4f46e5; color: white; padding: 12px 25px; text-decoration: none; font-weight: bold; border-radius: 5px; font-size: 16px;">View ${docType}</a>
+                <!-- CARD TEMPLATE -->
+                <div style="border: 1px solid #e5e7eb; background-color: #fffffbf0; padding: 30px; margin: 20px 0; text-align: center; border-radius: 8px;">
+                    <div style="font-size: 12px; font-weight: bold; color: #6b7280; text-transform: uppercase; margin-bottom: 5px; letter-spacing: 1px;">${docTypeCaps} AMOUNT</div>
+                    <div style="font-size: 28px; font-weight: bold; color: #dc2626; margin-bottom: 20px;">
+                        ${amountFormatted}
+                    </div>
+                    
+                    <div style="border-top: 1px solid #e5e7eb; margin: 20px 0;"></div>
+                    
+                    <table align="center" style="margin: 0 auto; text-align: left; font-size: 14px; border-spacing: 0;">
+                        <tr>
+                            <td style="color: #6b7280; padding: 5px 15px; font-weight: bold;">${docType} No</td>
+                            <td style="font-weight: bold; color: #111827;">${invoice.invoiceNumber}</td>
+                        </tr>
+                        <tr>
+                            <td style="color: #6b7280; padding: 5px 15px; font-weight: bold;">${docType} Date</td>
+                            <td style="font-weight: bold; color: #111827;">${dateFormatted}</td>
+                        </tr>
+                    </table>
+                    
+                    <div style="margin-top: 30px;">
+                        <a href="${link}" style="background-color: #22c55e; color: white; padding: 14px 30px; text-decoration: none; font-weight: bold; border-radius: 4px; font-size: 14px; display: inline-block; text-transform: uppercase;">VIEW ${docTypeCaps}</a>
+                    </div>
                 </div>
-                
+                <!-- END CARD TEMPLATE -->
+
                 <p style="font-size: 13px; color: #888; border-top: 1px solid #eee; padding-top: 20px;">
                     Regards,<br/>
-                    ${invoice.businessName}
+                    ${invoice.businessName}<br/>
+                    <p>📧 support@wappie.in</p>
+                    <p>🌐 www.wappie.in</p>
                 </p>
             </div>
         `;
