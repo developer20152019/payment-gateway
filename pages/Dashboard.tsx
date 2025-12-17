@@ -33,6 +33,16 @@ const formatDateToIST = (dateString: string) => {
   }
 };
 
+// Helper to get local YYYY-MM-DD string
+const getLocalDateString = (dateVal?: string | Date) => {
+    const d = dateVal ? new Date(dateVal) : new Date();
+    if (isNaN(d.getTime())) return '';
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+};
+
 const Dashboard: React.FC = () => {
   const navigate = useNavigate();
   const [invoices, setInvoices] = useState<InvoiceData[]>([]);
@@ -45,6 +55,9 @@ const Dashboard: React.FC = () => {
   const [placeOfSupplyFilter, setPlaceOfSupplyFilter] = useState<string>('ALL');
   const [dateRange, setDateRange] = useState({ start: '', end: '' });
   
+  // Stats Date Filter
+  const [statsDate, setStatsDate] = useState(getLocalDateString());
+
   // Resource Filters
   const [resourceSectionFilter, setResourceSectionFilter] = useState('');
   const [resourceNameFilter, setResourceNameFilter] = useState('');
@@ -189,15 +202,24 @@ const Dashboard: React.FC = () => {
       );
   };
 
+  // Filter stats by selected date
   const totalRevenue = invoices
-    .filter(i => i.status === PaymentStatus.PAID && i.type === 'INVOICE')
+    .filter(i => 
+        i.status === PaymentStatus.PAID && 
+        i.type === 'INVOICE' && 
+        getLocalDateString(i.date) === statsDate
+    )
     .reduce((sum, i) => sum + i.total, 0);
 
   const pendingAmount = invoices
-    .filter(i => i.status === PaymentStatus.PENDING && i.type === 'INVOICE')
+    .filter(i => 
+        i.status === PaymentStatus.PENDING && 
+        i.type === 'INVOICE' && 
+        getLocalDateString(i.date) === statsDate
+    )
     .reduce((sum, i) => sum + i.total, 0);
 
-  // Filter Logic
+  // Filter Logic for List
   const filteredInvoices = invoices.filter((invoice) => {
     const query = searchQuery.toLowerCase();
     const matchesSearch = (
@@ -305,7 +327,24 @@ const Dashboard: React.FC = () => {
       </nav>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-8">
-        {/* Stats */}
+        
+        {/* Stats Header */}
+        <div className="flex items-center justify-between mb-4">
+            <h3 className="text-gray-700 font-bold text-lg flex items-center gap-2">
+                Daily Overview
+            </h3>
+            <div className="relative group">
+                <input 
+                    type="date" 
+                    value={statsDate}
+                    onChange={(e) => setStatsDate(e.target.value)}
+                    className="pl-10 pr-4 py-2 bg-white border border-gray-200 rounded-lg text-sm font-medium text-gray-700 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all hover:border-gray-300 cursor-pointer"
+                />
+                <CalendarIcon className="w-5 h-5 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none group-hover:text-indigo-500 transition-colors" />
+            </div>
+        </div>
+
+        {/* Stats Cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
           <div className="relative overflow-hidden bg-white p-6 rounded-2xl shadow-[0_2px_10px_-3px_rgba(6,81,237,0.1)] border border-gray-100 group hover:border-indigo-100 transition-all">
              <div className="flex justify-between items-start">
@@ -321,7 +360,7 @@ const Dashboard: React.FC = () => {
              </div>
              <div className="mt-4 flex items-center text-sm text-green-600 font-medium">
                 <ArrowUpIcon className="w-4 h-4 mr-1" />
-                <span>Paid Invoices</span>
+                <span>Paid on {statsDate}</span>
              </div>
           </div>
           <div className="relative overflow-hidden bg-white p-6 rounded-2xl shadow-[0_2px_10px_-3px_rgba(6,81,237,0.1)] border border-gray-100 group hover:border-amber-100 transition-all">
@@ -337,7 +376,7 @@ const Dashboard: React.FC = () => {
                 </div>
              </div>
              <div className="mt-4 flex items-center text-sm text-amber-600 font-medium">
-                <span>Awaiting Payment</span>
+                <span>Created on {statsDate}</span>
              </div>
           </div>
         </div>
