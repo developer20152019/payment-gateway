@@ -41,7 +41,7 @@ const generateInvoiceNumber = () => {
 
 // Default data for a fresh invoice
 const getInitialInvoice = (): InvoiceData => ({
-  id: `inv_${Date.now()}`,
+  id: `est_${Date.now()}`,
   invoiceNumber: generateInvoiceNumber(),
   type: 'INVOICE',
   // Store full ISO string to capture exact creation time

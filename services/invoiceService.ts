@@ -114,47 +114,53 @@ const formatDateDDMMYYYY = (isoDate: string) => {
     }
 };
 
-// Helper: Generate HTML Email Body
-const generateEmailHtml = (invoice: InvoiceData, link: string) => {
+// Helper: Generate Email Body based on Type
+const generateEmailContent = (invoice: InvoiceData, link: string, type: 'CREATED' | 'PAID') => {
     const isQuote = invoice.type === 'QUOTATION';
-    const label = isQuote ? 'ESTIMATE' : 'INVOICE';
-    const number = invoice.paidInvoiceNumber || invoice.invoiceNumber;
-    const date = formatDateDDMMYYYY(invoice.date);
-    const amount = new Intl.NumberFormat('en-IN', { style: 'currency', currency: invoice.currency }).format(invoice.total);
+    const docType = isQuote ? 'Estimate' : 'Invoice';
+    // Use PaidInvoiceNumber for the final invoice ref if paid, otherwise the current number
+    const finalNumber = invoice.paidInvoiceNumber || invoice.invoiceNumber;
+    const refNumber = invoice.invoiceNumber; // The original ref/estimate number
     
-    return `
-      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; background-color: #ffffff; color: #333; padding-bottom: 20px;">
-        <div style="background-color: #fffbe6; padding: 40px 20px; text-align: center; border: 1px solid #f0f0f0; margin-bottom: 20px;">
-          <p style="margin: 0; font-size: 14px; font-weight: bold; color: #555; letter-spacing: 0.5px;">${label} AMOUNT</p>
-          <h1 style="margin: 15px 0 30px 0; font-size: 32px; color: #d9534f; font-weight: bold;">${amount}</h1>
-          
-          <div style="border-top: 1px solid #e6e1c5; margin: 20px auto; width: 80%;"></div>
-          
-          <table style="width: 100%; max-width: 320px; margin: 0 auto; text-align: left; font-size: 14px; border-collapse: collapse;">
-            <tr>
-              <td style="padding: 8px 0; color: #666;">${label === 'ESTIMATE' ? 'Estimate' : 'Invoice'} No</td>
-              <td style="padding: 8px 0; font-weight: bold; text-align: right; color: #333;">${number}</td>
-            </tr>
-            <tr>
-              <td style="padding: 8px 0; color: #666;">${label === 'ESTIMATE' ? 'Estimate' : 'Invoice'} Date</td>
-              <td style="padding: 8px 0; font-weight: bold; text-align: right; color: #333;">${date}</td>
-            </tr>
-          </table>
-  
-          <div style="margin-top: 40px;">
-            <a href="${link}" style="background-color: #5cb85c; color: white; padding: 14px 30px; text-decoration: none; font-weight: bold; font-size: 14px; display: inline-block; border-radius: 4px; box-shadow: 0 2px 5px rgba(0,0,0,0.1);">VIEW ${label}</a>
-          </div>
-        </div>
-        
-        <div style="padding: 0 20px; font-size: 13px; color: #888; line-height: 1.5;">
-          <p style="margin: 0 0 5px 0; font-weight: bold; color: #333;">Regards,</p>
-          <p style="margin: 0;">${invoice.sellerName}</p>
-          <p style="margin: 0;">${invoice.businessName}</p>
-          <p style="margin: 5px 0;">Mobile - ${invoice.sellerPhone}</p>
-          ${invoice.logoUrl ? `<div style="margin-top: 15px;"><img src="${invoice.logoUrl}" alt="Logo" style="height: 40px; display: block;"></div>` : ''}
-        </div>
-      </div>
-    `;
+    if (type === 'PAID') {
+        const subject = `Invoice ${finalNumber} for ${docType} ${refNumber}`;
+        const body = `
+            <div style="font-family: Arial, sans-serif; color: #333; line-height: 1.6;">
+                <p>Dear Customer,</p>
+                <p>Greetings from ${invoice.businessName}.</p>
+                <p>Please find attached the Invoice (<strong>${finalNumber}</strong>) issued against ${docType} ${refNumber} for your reference.</p>
+                <p>We kindly request you to review the invoice and acknowledge receipt.</p>
+                <br/>
+                <p>Thank you for your continued association with us.</p>
+                <p><strong>Happy Messaging</strong></p>
+                <p>Warm regards,<br/>
+                ${invoice.businessName}<br/>
+                ${invoice.sellerEmail ? `📧 ${invoice.sellerEmail}<br/>` : ''}
+                ${invoice.sellerPhone ? `📱 ${invoice.sellerPhone}` : ''}
+                </p>
+            </div>
+        `;
+        return { subject, body };
+    } else {
+        // CREATED (Default)
+        const subject = `${docType} #${refNumber} from ${invoice.businessName}`;
+        const body = `
+            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; background-color: #ffffff; color: #333;">
+                <p>Dear <strong>"${invoice.buyerName}"</strong>,</p>
+                <p>Thank you for contacting us. Your ${docType.toLowerCase()} can be paid, viewed, printed and downloaded as PDF from the link below.</p>
+                
+                <div style="margin: 30px 0; text-align: center;">
+                    <a href="${link}" style="background-color: #4f46e5; color: white; padding: 12px 25px; text-decoration: none; font-weight: bold; border-radius: 5px; font-size: 16px;">View ${docType}</a>
+                </div>
+                
+                <p style="font-size: 13px; color: #888; border-top: 1px solid #eee; padding-top: 20px;">
+                    Regards,<br/>
+                    ${invoice.businessName}
+                </p>
+            </div>
+        `;
+        return { subject, body };
+    }
 };
 
 // --- Hybrid Service (API First -> Fallback to LS) ---
@@ -262,32 +268,15 @@ export const InvoiceService = {
   sendEmailNotification: async (invoice: InvoiceData, type: 'CREATED' | 'PAID') => {
     try {
         const link = `${window.location.origin}${window.location.pathname}#/view/${invoice.id}`;
-        
-        // Basic HTML Body for standard notification
-        const htmlBody = `
-            <div style="font-family: Arial, sans-serif; color: #333;">
-                <p>Dear ${invoice.buyerName},</p>
-                <p>Please find the link to your ${invoice.type === 'QUOTATION' ? 'Quotation' : 'Invoice'} below:</p>
-                <p>
-                    <a href="${link}" style="background-color: #4f46e5; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; display: inline-block;">
-                        View Document
-                    </a>
-                </p>
-                <p style="font-size: 12px; color: #666;">Or copy this link: ${link}</p>
-                <br/>
-                <p>Regards,<br/>${invoice.businessName}</p>
-            </div>
-        `;
+        const { subject, body } = generateEmailContent(invoice, link, type);
 
         await fetch(`${API_BASE}/notify`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 to: invoice.buyerEmail,
-                subject: type === 'PAID' 
-                    ? `Receipt for Invoice #${invoice.invoiceNumber}` 
-                    : `${invoice.type === 'QUOTATION' ? 'Quotation' : 'Invoice'} #${invoice.invoiceNumber} from ${invoice.businessName}`,
-                body: htmlBody, 
+                subject: subject,
+                body: body, 
                 link: link,
                 type: type
             })
@@ -298,20 +287,20 @@ export const InvoiceService = {
     }
   },
 
-  sendPdfByEmail: async (invoice: InvoiceData, pdfBase64: string): Promise<void> => {
+  sendPdfByEmail: async (invoice: InvoiceData, pdfBase64: string, type: 'CREATED' | 'PAID' = 'CREATED'): Promise<void> => {
     const link = `${window.location.origin}${window.location.pathname}#/view/${invoice.id}`;
     // Strip data URI prefix if present (e.g. "data:application/pdf;base64,")
     const base64Content = pdfBase64.includes(',') ? pdfBase64.split(',')[1] : pdfBase64;
 
-    const emailHtml = generateEmailHtml(invoice, link);
+    const { subject, body } = generateEmailContent(invoice, link, type);
 
     const response = await fetch(`${API_BASE}/notify`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
             to: invoice.buyerEmail,
-            subject: `${invoice.type === 'QUOTATION' ? 'Estimate' : 'Invoice'} #${invoice.paidInvoiceNumber || invoice.invoiceNumber} from ${invoice.businessName}`,
-            body: emailHtml, // Using the new HTML template
+            subject: subject,
+            body: body, // Using the custom HTML template based on Type
             link: link,
             type: 'MANUAL_PDF',
             attachments: [

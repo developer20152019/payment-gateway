@@ -101,7 +101,8 @@ const ViewInvoice: React.FC = () => {
 
         // 1. Attempt Email
         try {
-            await InvoiceService.sendPdfByEmail(currentInvoice, pdfBase64);
+            // Updated: Pass triggerType to use the correct email template (Created vs Paid)
+            await InvoiceService.sendPdfByEmail(currentInvoice, pdfBase64, triggerType);
             emailSuccess = true;
         } catch (emailError: any) {
             console.error("Email Failed:", emailError);

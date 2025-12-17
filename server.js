@@ -350,7 +350,7 @@ app.post('/api/notify', async (req, res) => {
         });
 
         const info = await transporter.sendMail({
-            from: process.env.SMTP_FROM || `"PayLink" <${process.env.SMTP_USER}>`,
+            from: process.env.SMTP_FROM || `"Wappie Finance" <${process.env.SMTP_USER}>`,
             to: to,
             subject: subject,
             html: body, // Assume body is HTML
