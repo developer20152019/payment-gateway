@@ -338,7 +338,7 @@ const Dashboard: React.FC = () => {
             <div className="w-8 h-8 bg-indigo-600 text-white rounded-lg flex items-center justify-center">
                 <DocumentTextIcon className="w-5 h-5" />
             </div>
-            <span className="text-gray-900">PayLink</span>
+            <span className="text-gray-900">Wappie Finance</span>
           </div>
           <div className="flex gap-2 sm:gap-3">
             <button
