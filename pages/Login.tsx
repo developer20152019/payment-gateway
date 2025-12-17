@@ -24,7 +24,7 @@ const Login: React.FC = () => {
         });
 
         const data = await response.json();
- navigate('/');
+
         if (response.ok && data.success) {
             localStorage.setItem('isAuthenticated', 'true');
             // Store user details if needed for branding/personalization
@@ -119,7 +119,11 @@ const Login: React.FC = () => {
           </form>
         </div>
         
-        
+        <div className="mt-6 bg-indigo-50 p-4 rounded-lg border border-indigo-100 sm:mx-0">
+            <h4 className="text-xs font-bold text-indigo-800 uppercase tracking-wider mb-1">Demo Credentials</h4>
+            <p className="text-xs text-indigo-600">Email: <strong>admin@paylink.com</strong></p>
+            <p className="text-xs text-indigo-600">Password: <strong>admin123</strong></p>
+        </div>
       </div>
     </div>
   );
