@@ -478,7 +478,7 @@ const ViewInvoice: React.FC = () => {
         <div className="max-w-5xl mx-auto flex justify-between items-center">
           <div className="font-bold text-xl text-gray-800 cursor-pointer flex items-center gap-2" onClick={() => navigate('/')}>
              <span className="bg-indigo-600 text-white w-8 h-8 flex items-center justify-center rounded-lg">P</span>
-             PayLink
+             Wappie Finance
           </div>
           <div className="flex gap-2 items-center">
              
