@@ -98,6 +98,7 @@ const CreateInvoice: React.FC = () => {
   
   // States
   const [showSuggestions, setShowSuggestions] = useState(false);
+  const [activeItemIndex, setActiveItemIndex] = useState<number | null>(null); // Track which item row has open dropdown
   const [shippingSameAsBilling, setShippingSameAsBilling] = useState(false);
 
   // New Customer Modal State
@@ -240,27 +241,22 @@ const CreateInvoice: React.FC = () => {
     setInvoice({ ...invoice, items: newItems, ...totals });
   };
 
-  const handleProductSelectByName = (itemId: string, productName: string) => {
-    const product = products.find(p => p.name === productName);
-    if (!product) return;
-
-    const newItems = invoice.items.map(item => {
-        if(item.id === itemId) {
-            const qty = parseFloat(item.quantity.toString()) || 0;
-            const updated = { 
-                ...item, 
-                name: product.name,
-                description: product.description.substring(0, 100), 
-                rate: product.rate,
-                amount: qty * product.rate
-            };
-            return updated;
-        }
-        return item;
-    });
+  const handleProductSelect = (index: number, product: Product) => {
+    const newItems = [...invoice.items];
+    const currentItem = newItems[index];
+    const qty = parseFloat(currentItem.quantity.toString()) || 1;
+    
+    newItems[index] = {
+        ...currentItem,
+        name: product.name,
+        description: product.description,
+        rate: product.rate,
+        amount: qty * product.rate
+    };
     
     const totals = recalculateTotals(newItems);
     setInvoice({ ...invoice, items: newItems, ...totals });
+    setActiveItemIndex(null); // Close dropdown
   };
 
   const handleCustomerSelect = (customer: Customer) => {
@@ -607,6 +603,7 @@ const CreateInvoice: React.FC = () => {
                                 setShowSuggestions(true);
                             }}
                             onFocus={() => setShowSuggestions(true)}
+                            onClick={() => setShowSuggestions(true)} // Open on click too
                         />
                         {/* Suggestions Dropdown */}
                         {showSuggestions && (
@@ -686,13 +683,24 @@ const CreateInvoice: React.FC = () => {
                 </div>
 
                 {/* 3. Items */}
-                <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
+                <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 relative">
                     <h2 className="text-sm font-bold text-gray-500 uppercase tracking-wider mb-4">Line Items</h2>
                     <div className="space-y-4">
-                        {invoice.items.map((item, index) => (
+                        {invoice.items.map((item, index) => {
+                            // Logic to find available products for THIS row (filter out already selected in OTHER rows)
+                            const otherItemNames = invoice.items
+                                .filter((_, i) => i !== index)
+                                .map(i => i.name);
+
+                            const filteredProducts = products.filter(p =>
+                                !otherItemNames.includes(p.name) &&
+                                p.name.toLowerCase().includes((item.name || '').toLowerCase())
+                            );
+
+                            return (
                             <div key={item.id} className="group relative p-4 border border-gray-200 rounded-lg hover:border-indigo-300 hover:shadow-sm transition-all bg-gray-50/50">
                                 <div className="grid grid-cols-12 gap-3 mb-2">
-                                    <div className="col-span-12 sm:col-span-6">
+                                    <div className="col-span-12 sm:col-span-6 relative">
                                         <label className="text-[10px] text-gray-400 font-bold uppercase mb-1 block">Item Name</label>
                                         <input 
                                             type="text" 
@@ -700,20 +708,30 @@ const CreateInvoice: React.FC = () => {
                                             placeholder="Item / Service"
                                             value={item.name}
                                             onChange={(e) => handleItemChange(item.id, 'name', e.target.value)}
-                                            list={`products-list-${item.id}`}
+                                            onFocus={() => setActiveItemIndex(index)}
+                                            onClick={() => setActiveItemIndex(index)}
                                         />
-                                        <datalist id={`products-list-${item.id}`}>
-                                            {products.map(p => <option key={p.id} value={p.name} />)}
-                                        </datalist>
-                                        {/* Auto-fill Helper */}
-                                        {item.name && products.some(p => p.name === item.name) && (
-                                            <button 
-                                                type="button"
-                                                onClick={() => handleProductSelectByName(item.id, item.name)}
-                                                className="text-[10px] text-indigo-600 font-medium mt-1 hover:underline"
-                                            >
-                                                Apply Product Defaults
-                                            </button>
+                                        
+                                        {/* Custom Item Dropdown */}
+                                        {activeItemIndex === index && (
+                                            <div className="absolute z-50 left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-xl max-h-48 overflow-y-auto">
+                                                {filteredProducts.map(p => (
+                                                    <div 
+                                                        key={p.id} 
+                                                        className="px-3 py-2 hover:bg-indigo-50 cursor-pointer text-sm border-b border-gray-50 last:border-0"
+                                                        onClick={() => handleProductSelect(index, p)}
+                                                    >
+                                                        <div className="font-bold text-gray-800">{p.name}</div>
+                                                        <div className="text-xs text-gray-500 truncate">{p.description}</div>
+                                                        <div className="text-xs font-mono text-indigo-600 mt-0.5">Rate: {p.rate}</div>
+                                                    </div>
+                                                ))}
+                                                {filteredProducts.length === 0 && (
+                                                    <div className="px-3 py-2 text-xs text-gray-400 italic">
+                                                        {item.name ? 'No matching products available' : 'Start typing to search products'}
+                                                    </div>
+                                                )}
+                                            </div>
                                         )}
                                     </div>
                                     <div className="col-span-4 sm:col-span-2">
@@ -762,7 +780,7 @@ const CreateInvoice: React.FC = () => {
                                     </button>
                                 )}
                             </div>
-                        ))}
+                        )})}
                     </div>
                     <button 
                         onClick={handleAddItem}
@@ -770,6 +788,11 @@ const CreateInvoice: React.FC = () => {
                     >
                         <PlusIcon className="w-4 h-4" /> Add Item
                     </button>
+                    
+                    {/* Overlay to close item dropdown */}
+                    {activeItemIndex !== null && (
+                        <div className="fixed inset-0 z-0 cursor-default" onClick={() => setActiveItemIndex(null)}></div>
+                    )}
                 </div>
 
                 {/* 4. Notes & Terms */}
