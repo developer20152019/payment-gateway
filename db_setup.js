@@ -1,4 +1,3 @@
-
 require('dotenv').config();
 const mysql = require('mysql2/promise');
 
@@ -24,23 +23,6 @@ async function setupDatabase() {
         console.log("   ✅ Connected successfully.");
 
         console.log("   Setting up tables...");
-
-        // Users Table
-        await connection.query(`
-            CREATE TABLE IF NOT EXISTS Users (
-                Email VARCHAR(100) PRIMARY KEY,
-                Password VARCHAR(255),
-                Name VARCHAR(100)
-            )
-        `);
-        
-        // Seed Admin User if not exists
-        const [users] = await connection.query('SELECT * FROM Users WHERE Email = ?', ['admin@paylink.com']);
-        if (users.length === 0) {
-            await connection.query('INSERT INTO Users (Email, Password, Name) VALUES (?, ?, ?)', 
-                ['admin@paylink.com', 'admin123', 'Administrator']);
-            console.log("   ✅ Default admin user created.");
-        }
 
         // Invoices Table
         await connection.query(`
