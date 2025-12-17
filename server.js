@@ -126,6 +126,37 @@ const ccav = {
 
 // --- API Routes ---
 
+// 0. AUTHENTICATION
+app.post('/api/login', async (req, res) => {
+    const { email, password } = req.body;
+    
+    if (!email || !password) {
+        return res.status(400).json({ error: 'Email and Password are required' });
+    }
+
+    try {
+        // Simple query for authentication. 
+        // Note: In production, passwords should be hashed using bcrypt.
+        const [rows] = await pool.query(
+            'SELECT ID, Email, Name FROM Users WHERE Email = ? AND Password = ?', 
+            [email, password]
+        );
+
+        if (rows.length > 0) {
+            const user = rows[0];
+            res.json({ 
+                success: true, 
+                user: { id: user.ID, name: user.Name, email: user.Email } 
+            });
+        } else {
+            res.status(401).json({ error: 'Invalid email or password' });
+        }
+    } catch (err) {
+        console.error('Login Error:', err);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
 // 1. PRODUCTS
 app.get('/api/products', async (req, res) => {
     try {

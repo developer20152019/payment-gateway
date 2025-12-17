@@ -24,6 +24,24 @@ async function setupDatabase() {
 
         console.log("   Setting up tables...");
 
+        // Users Table for Authentication
+        await connection.query(`
+            CREATE TABLE IF NOT EXISTS Users (
+                ID VARCHAR(50) PRIMARY KEY,
+                Email VARCHAR(100) UNIQUE NOT NULL,
+                Password VARCHAR(100) NOT NULL,
+                Name VARCHAR(100)
+            )
+        `);
+        console.log("   ✅ Table 'Users' ensured.");
+
+        // Seed initial admin user if not exists
+        await connection.query(`
+            INSERT IGNORE INTO Users (ID, Email, Password, Name) 
+            VALUES ('u_admin_01', 'admin@paylink.com', 'admin123', 'Administrator')
+        `);
+        console.log("   ✅ Initial admin user seeded.");
+
         // Invoices Table
         await connection.query(`
             CREATE TABLE IF NOT EXISTS Invoices (
