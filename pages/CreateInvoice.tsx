@@ -8,14 +8,6 @@ import { ProductService } from '../services/productService';
 import { CustomerService } from '../services/customerService';
 import { SettingsService } from '../services/settingsService';
 
-const RESOURCE_SECTIONS = [
-    "Google", "Facebook", "Linkedin", "Cold Calling", "Website", "Recharge", "Reference"
-];
-
-const RESOURCE_NAMES = [
-  "Swapan Dutta", "Sharbhashish Nayak", "Dipraj Nath"
-];
-
 const generateInvoiceNumber = () => {
   const date = new Date();
   const year = date.getFullYear();
@@ -70,6 +62,9 @@ const CreateInvoice: React.FC = () => {
   const [invoice, setInvoice] = useState<InvoiceData>(getInitialInvoice);
   const [products, setProducts] = useState<Product[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
+  const [resourceSections, setResourceSections] = useState<string[]>([]);
+  const [resourceNames, setResourceNames] = useState<string[]>([]);
+  
   const [isEditMode, setIsEditMode] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
@@ -82,48 +77,45 @@ const CreateInvoice: React.FC = () => {
       id: '', name: '', email: '', phone: '', address: '', gstin: '',
       contactPerson: '', shippingAddress: '', placeOfSupply: '', pinCode: ''
   });
-  const [newCustomerSameAsBilling, setNewCustomerSameAsBilling] = useState(false);
 
   useEffect(() => {
     const init = async () => {
         setIsLoading(true);
-        const [prodData, custData] = await Promise.all([
-            ProductService.getAllProducts(),
-            CustomerService.getAllCustomers()
-        ]);
-        setProducts(prodData);
-        setCustomers(custData);
+        try {
+            const [prodData, custData, resData] = await Promise.all([
+                ProductService.getAllProducts(),
+                CustomerService.getAllCustomers(),
+                fetch('/api/resources').then(r => r.json())
+            ]);
+            setProducts(prodData);
+            setCustomers(custData);
+            setResourceSections(resData.sections || []);
+            setResourceNames(resData.names || []);
 
-        if (id) {
-          try {
-            const existingInvoice = await InvoiceService.getInvoiceById(id);
-            if (existingInvoice) {
-              setInvoice({
-                  ...existingInvoice,
-                  resourceSection: existingInvoice.resourceSection || '',
-                  resourceName: existingInvoice.resourceName || '',
-                  paymentGateway: existingInvoice.paymentGateway || '',
-                  type: existingInvoice.type || 'INVOICE',
-                  template: 'modern',
-                  buyerContactPerson: existingInvoice.buyerContactPerson || '',
-                  buyerShippingAddress: existingInvoice.buyerShippingAddress || '',
-                  placeOfSupply: existingInvoice.placeOfSupply || '',
-                  buyerPinCode: existingInvoice.buyerPinCode || ''
-              });
-              if (existingInvoice.buyerAddress && existingInvoice.buyerShippingAddress && existingInvoice.buyerAddress === existingInvoice.buyerShippingAddress) {
-                  setShippingSameAsBilling(true);
-              }
-              setIsEditMode(true);
+            if (id) {
+                const existingInvoice = await InvoiceService.getInvoiceById(id);
+                if (existingInvoice) {
+                    setInvoice({
+                        ...existingInvoice,
+                        resourceSection: existingInvoice.resourceSection || '',
+                        resourceName: existingInvoice.resourceName || '',
+                        paymentGateway: existingInvoice.paymentGateway || '',
+                        type: existingInvoice.type || 'INVOICE',
+                        template: 'modern',
+                        buyerContactPerson: existingInvoice.buyerContactPerson || '',
+                        buyerShippingAddress: existingInvoice.buyerShippingAddress || '',
+                        placeOfSupply: existingInvoice.placeOfSupply || '',
+                        buyerPinCode: existingInvoice.buyerPinCode || ''
+                    });
+                    if (existingInvoice.buyerAddress && existingInvoice.buyerShippingAddress && existingInvoice.buyerAddress === existingInvoice.buyerShippingAddress) {
+                        setShippingSameAsBilling(true);
+                    }
+                    setIsEditMode(true);
+                } else {
+                    alert("Invoice not found.");
+                    navigate('/');
+                }
             } else {
-              alert("Invoice not found.");
-              navigate('/');
-            }
-          } catch(e) {
-              console.error(e);
-              alert("Error loading invoice");
-          }
-        } else {
-            try {
                 const profile = await SettingsService.getSellerProfile();
                 if (profile) {
                     setInvoice(prev => ({
@@ -138,11 +130,12 @@ const CreateInvoice: React.FC = () => {
                         brandColor: profile.brandColor || prev.brandColor
                     }));
                 }
-            } catch(e) {
-                console.error("Failed to load seller defaults", e);
             }
+        } catch(e) {
+            console.error(e);
+        } finally {
+            setIsLoading(false);
         }
-        setIsLoading(false);
     };
     init();
   }, [id, navigate]);
@@ -272,21 +265,21 @@ const CreateInvoice: React.FC = () => {
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4 p-4 bg-gray-50 rounded-lg border border-gray-100">
                         <div>
                             <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Resource Section *</label>
-                            <select className="w-full border rounded-md p-2 text-sm" value={invoice.resourceSection} onChange={(e) => handleChange('resourceSection', e.target.value)}>
+                            <select className="w-full border rounded-md p-2 text-sm bg-white" value={invoice.resourceSection} onChange={(e) => handleChange('resourceSection', e.target.value)}>
                                 <option value="">Select Section</option>
-                                {RESOURCE_SECTIONS.map(s => <option key={s} value={s}>{s}</option>)}
+                                {resourceSections.map(s => <option key={s} value={s}>{s}</option>)}
                             </select>
                         </div>
                         <div>
                             <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Resource Name *</label>
-                            <select className="w-full border rounded-md p-2 text-sm" value={invoice.resourceName} onChange={(e) => handleChange('resourceName', e.target.value)}>
+                            <select className="w-full border rounded-md p-2 text-sm bg-white" value={invoice.resourceName} onChange={(e) => handleChange('resourceName', e.target.value)}>
                                 <option value="">Select Resource</option>
-                                {RESOURCE_NAMES.map(n => <option key={n} value={n}>{n}</option>)}
+                                {resourceNames.map(n => <option key={n} value={n}>{n}</option>)}
                             </select>
                         </div>
                         <div>
                             <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Payment Gateway</label>
-                            <select className="w-full border border-gray-300 rounded-md p-2 text-sm" value={invoice.paymentGateway} onChange={(e) => handleChange('paymentGateway', e.target.value)}>
+                            <select className="w-full border border-gray-300 rounded-md p-2 text-sm bg-white" value={invoice.paymentGateway} onChange={(e) => handleChange('paymentGateway', e.target.value)}>
                                 <option value="">None (Cash/Manual)</option>
                                 <option value="Razorpay">Razorpay</option>
                                 <option value="CCAvenue">CCAvenue</option>
@@ -298,7 +291,7 @@ const CreateInvoice: React.FC = () => {
                 <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
                     <div className="flex justify-between items-center mb-4">
                         <h2 className="text-sm font-bold text-gray-500 uppercase">Bill To (Client)</h2>
-                        <button onClick={() => setShowAddCustomerModal(true)} className="text-xs flex items-center gap-1 text-indigo-600 hover:text-indigo-800 font-medium"><UserPlusIcon className="w-4 h-4" /> Add New Client</button>
+                        <button onClick={() => navigate('/customers')} className="text-xs flex items-center gap-1 text-indigo-600 hover:text-indigo-800 font-medium"><UserPlusIcon className="w-4 h-4" /> Manage Clients</button>
                     </div>
                     <div className="relative mb-4">
                         <input type="text" className="w-full border border-gray-300 rounded-lg p-2.5 text-sm outline-none font-medium" placeholder="Search client..." value={invoice.buyerName} onChange={(e) => { handleChange('buyerName', e.target.value); setShowSuggestions(true); }} onFocus={() => setShowSuggestions(true)} />

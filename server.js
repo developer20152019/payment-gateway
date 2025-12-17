@@ -20,7 +20,7 @@ app.use(cors());
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
-// --- Serve React Build Files (Production) ---
+// --- Serve React Build Files ---
 app.use(express.static(path.join(__dirname, 'dist')));
 
 // --- Database Connection ---
@@ -37,18 +37,62 @@ const dbConfig = {
 
 const pool = mysql.createPool(dbConfig);
 
-// Test DB Connection
-(async () => {
+// --- AUTH API ---
+app.post('/api/auth/login', async (req, res) => {
+    const { email, password } = req.body;
     try {
-        const connection = await pool.getConnection();
-        console.log('✅ Connected to MySQL Database');
-        connection.release();
-    } catch (err) {
-        console.error('❌ Database Connection Failed:', err.message);
-    }
-})();
+        const [rows] = await pool.query("SELECT * FROM Users WHERE Email = ? AND Password = ?", [email, password]);
+        if (rows.length > 0) {
+            const user = rows[0];
+            res.json({ 
+                success: true, 
+                user: { id: user.ID, username: user.Username, email: user.Email } 
+            });
+        } else {
+            res.status(401).json({ success: false, error: 'Invalid email or password' });
+        }
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
 
-// Helper: Generate Paid Invoice Number
+// --- RESOURCES API (Dynamic Dropdowns) ---
+app.get('/api/resources', async (req, res) => {
+    try {
+        const [rows] = await pool.query("SELECT * FROM Resources");
+        const sections = rows.filter(r => r.Type === 'SECTION').map(r => r.Value);
+        const names = rows.filter(r => r.Type === 'NAME').map(r => r.Value);
+        res.json({ sections, names });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// --- INVOICES API ---
+app.get('/api/invoices', async (req, res) => {
+    try {
+        const [rows] = await pool.query("SELECT * FROM Invoices ORDER BY Date DESC");
+        res.json(rows);
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.get('/api/invoices/:id', async (req, res) => {
+    try {
+        const [invRows] = await pool.query("SELECT * FROM Invoices WHERE ID = ?", [req.params.id]);
+        if (invRows.length === 0) return res.status(404).json({ error: 'Not found' });
+        
+        const [itemRows] = await pool.query("SELECT ID, ItemName, Description, Quantity, Rate, Amount FROM LineItems WHERE InvoiceID = ?", [req.params.id]);
+        const invoice = invRows[0];
+        invoice.items = itemRows;
+        res.json(invoice);
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// Helper: IST DateTime
+function toMysqlDateTime(isoString) {
+    const d = isoString ? new Date(isoString) : new Date();
+    const istOffset = 19800000; 
+    const istDate = new Date(d.getTime() + istOffset);
+    return istDate.toISOString().slice(0, 19).replace('T', ' ');
+}
+
+// Helper: Sequential INV Numbers
 async function generatePaidInvoiceNumber() {
     try {
         const [rows] = await pool.query("SELECT COUNT(*) as count FROM Invoices WHERE PaidInvoiceNumber IS NOT NULL AND PaidInvoiceNumber != ''");
@@ -59,48 +103,9 @@ async function generatePaidInvoiceNumber() {
     }
 }
 
-function toMysqlDateTime(isoString) {
-    const d = isoString ? new Date(isoString) : new Date();
-    const istOffset = 19800000; // 5.5 hours
-    const istDate = new Date(d.getTime() + istOffset);
-    return istDate.toISOString().slice(0, 19).replace('T', ' ');
-}
-
-const razorpay = new Razorpay({
-    key_id: process.env.RAZORPAY_KEY_ID || 'rzp_test_placeholder',
-    key_secret: process.env.RAZORPAY_KEY_SECRET || 'secret_placeholder'
-});
-
-const ccav = {
-    encrypt: (plainText, workingKey) => {
-        const m = crypto.createHash('md5').update(workingKey).digest();
-        const iv = Buffer.from('\x00\x01\x02\x03\x04\x05\x06\x07\x08\x09\x0a\x0b\x0c\x0d\x0e\x0f', 'binary');
-        const cipher = crypto.createCipheriv('aes-128-cbc', m, iv);
-        let encoded = cipher.update(plainText, 'utf8', 'hex');
-        encoded += cipher.final('hex');
-        return encoded;
-    },
-    decrypt: (encText, workingKey) => {
-        const m = crypto.createHash('md5').update(workingKey).digest();
-        const iv = Buffer.from('\x00\x01\x02\x03\x04\x05\x06\x07\x08\x09\x0a\x0b\x0c\x0d\x0e\x0f', 'binary');
-        const decipher = crypto.createDecipheriv('aes-128-cbc', m, iv);
-        let decoded = decipher.update(encText, 'hex', 'utf8');
-        decoded += decipher.final('utf8');
-        return decoded;
-    }
-};
-
-// API Routes
-app.get('/api/products', async (req, res) => {
-    try {
-        const [rows] = await pool.query(`SELECT ID as id, Name as name, Description as description, Rate as rate FROM Products`);
-        res.json(rows);
-    } catch (err) { res.status(500).json({ error: err.message }); }
-});
-
 app.post('/api/invoices', async (req, res) => {
     const inv = req.body;
-    if (inv.status === 'PAID' && !inv.paidInvoiceNumber) {
+    if (inv.status === 'PAID' && !inv.paidInvoiceNumber && inv.type === 'INVOICE') {
         inv.paidInvoiceNumber = await generatePaidInvoiceNumber();
     }
     const sqlDate = toMysqlDateTime(inv.date);
@@ -128,16 +133,111 @@ app.post('/api/invoices', async (req, res) => {
 
         await pool.query('DELETE FROM LineItems WHERE InvoiceID = ?', [inv.id]);
         if (inv.items?.length > 0) {
-            const itemValues = inv.items.map((item, idx) => [`li_${Date.now()}_${idx}`, inv.id, item.name, item.description, item.quantity, item.rate, item.amount]);
+            const itemValues = inv.items.map((item) => [
+                item.id || `li_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
+                inv.id, item.name, item.description, item.quantity, item.rate, item.amount
+            ]);
             await pool.query('INSERT INTO LineItems (ID, InvoiceID, ItemName, Description, Quantity, Rate, Amount) VALUES ?', [itemValues]);
         }
         res.json({ success: true, id: inv.id, paidInvoiceNumber: inv.paidInvoiceNumber });
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+app.delete('/api/invoices/:id', async (req, res) => {
+    try {
+        await pool.query("DELETE FROM Invoices WHERE ID = ?", [req.params.id]);
+        res.json({ success: true });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// --- API ROUTES: PRODUCTS ---
+app.get('/api/products', async (req, res) => {
+    try {
+        const [rows] = await pool.query("SELECT ID as id, Name as name, Description as description, Rate as rate FROM Products");
+        res.json(rows);
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.post('/api/products', async (req, res) => {
+    const p = req.body;
+    try {
+        await pool.query("INSERT INTO Products (ID, Name, Description, Rate) VALUES (?, ?, ?, ?) ON DUPLICATE KEY UPDATE Name=?, Description=?, Rate=?", 
+            [p.id, p.name, p.description, p.rate, p.name, p.description, p.rate]);
+        res.json({ success: true });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.delete('/api/products/:id', async (req, res) => {
+    try {
+        await pool.query("DELETE FROM Products WHERE ID = ?", [req.params.id]);
+        res.json({ success: true });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// --- API ROUTES: CUSTOMERS ---
+app.get('/api/customers', async (req, res) => {
+    try {
+        const [rows] = await pool.query("SELECT * FROM Customers");
+        res.json(rows);
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.post('/api/customers', async (req, res) => {
+    const c = req.body;
+    try {
+        await pool.query(`INSERT INTO Customers (ID, Name, ContactPerson, Email, Phone, Address, ShippingAddress, Gstin, PlaceOfSupply, PinCode)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE Name=?, ContactPerson=?, Email=?, Phone=?, Address=?, ShippingAddress=?, Gstin=?, PlaceOfSupply=?, PinCode=?`,
+            [c.id, c.name, c.contactPerson, c.email, c.phone, c.address, c.shippingAddress, c.gstin, c.placeOfSupply, c.pinCode,
+             c.name, c.contactPerson, c.email, c.phone, c.address, c.shippingAddress, c.gstin, c.placeOfSupply, c.pinCode]);
+        res.json({ success: true });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.delete('/api/customers/:id', async (req, res) => {
+    try {
+        await pool.query("DELETE FROM Customers WHERE ID = ?", [req.params.id]);
+        res.json({ success: true });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// --- API ROUTES: SETTINGS ---
+app.get('/api/settings/seller', async (req, res) => {
+    try {
+        const [rows] = await pool.query("SELECT * FROM Settings WHERE ID = 1");
+        res.json(rows[0] || {});
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.post('/api/settings/seller', async (req, res) => {
+    const s = req.body;
+    try {
+        await pool.query(`INSERT INTO Settings (ID, SellerName, BusinessName, SellerAddress, SellerGstin, SellerEmail, SellerPhone, LogoUrl, BrandColor)
+            VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE SellerName=?, BusinessName=?, SellerAddress=?, SellerGstin=?, SellerEmail=?, SellerPhone=?, LogoUrl=?, BrandColor=?`,
+            [s.sellerName, s.businessName, s.sellerAddress, s.sellerGstin, s.sellerEmail, s.sellerPhone, s.logoUrl, s.brandColor,
+             s.sellerName, s.businessName, s.sellerAddress, s.sellerGstin, s.sellerEmail, s.sellerPhone, s.logoUrl, s.brandColor]);
+        res.json({ success: true });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// --- NOTIFICATIONS & PAYMENTS ---
+app.post('/api/notify', async (req, res) => {
+    console.log("Email Notification requested for:", req.body.to);
+    res.json({ success: true, message: "Email logic stubbed (Configure SMTP in .env to enable)" });
+});
+
+app.post('/api/whatsapp/send', async (req, res) => {
+    console.log("WhatsApp Notification requested for:", req.body.to);
+    res.json({ success: true, message: "WhatsApp logic stubbed" });
+});
+
+app.post('/api/payment/razorpay/create-order', async (req, res) => {
+    res.status(501).json({ error: "Razorpay Key ID not configured in .env" });
+});
+
+// --- CLIENT-SIDE ROUTING FALLBACK ---
 app.get('*', (req, res) => {
     if (req.path.startsWith('/api')) return res.status(404).json({ error: 'API not found' });
     res.sendFile(path.join(__dirname, 'dist', 'index.html'));
 });
 
-app.listen(PORT, () => console.log(`🚀 Server running on http://localhost:${PORT}`));
+app.listen(PORT, () => console.log(`🚀 PayLink Backend running on http://localhost:${PORT}`));
