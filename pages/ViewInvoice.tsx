@@ -1,18 +1,15 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { useParams, useNavigate, useLocation } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import { InvoiceData, PaymentStatus } from '../types';
 import { InvoicePreview } from '../components/InvoicePreview';
-import { ShieldCheckIcon, ShareIcon, PrinterIcon, ArrowDownTrayIcon, CheckCircleIcon, XCircleIcon, SparklesIcon, ClipboardIcon } from '@heroicons/react/24/outline';
+import { ShieldCheckIcon, ShareIcon, ArrowDownTrayIcon } from '@heroicons/react/24/outline';
 import { InvoiceService } from '../services/invoiceService';
-import { AIService } from '../services/aiService';
 
 const ViewInvoice: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const [invoice, setInvoice] = useState<InvoiceData | null>(null);
   const [isDownloading, setIsDownloading] = useState(false);
-  const [isGeneratingAI, setIsGeneratingAI] = useState(false);
-  const [aiSummary, setAiSummary] = useState<string | null>(null);
   const [notification, setNotification] = useState<{message: string, type: string} | null>(null);
 
   const fetchInvoice = useCallback(async () => {
@@ -26,14 +23,6 @@ const ViewInvoice: React.FC = () => {
   useEffect(() => {
     fetchInvoice();
   }, [fetchInvoice]);
-
-  const handleGenerateAISummary = async () => {
-    if (!invoice) return;
-    setIsGeneratingAI(true);
-    const summary = await AIService.generateInvoiceSummary(invoice);
-    setAiSummary(summary);
-    setIsGeneratingAI(false);
-  };
 
   const handleCopyLink = () => {
     navigator.clipboard.writeText(window.location.href);
@@ -73,12 +62,8 @@ const ViewInvoice: React.FC = () => {
              Wappie Finance
           </div>
           <div className="flex gap-2">
-            <button onClick={handleGenerateAISummary} disabled={isGeneratingAI} className="p-2 text-indigo-600 hover:bg-indigo-50 rounded-full transition-all group relative">
-               <SparklesIcon className={`w-6 h-6 ${isGeneratingAI ? 'animate-spin' : ''}`} />
-               <span className="absolute -bottom-10 left-1/2 -translate-x-1/2 bg-gray-900 text-white text-[10px] px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">AI Summary</span>
-            </button>
-            <button onClick={handleDownloadPdf} className="p-2 text-gray-600 hover:bg-gray-100 rounded-full">
-               <ArrowDownTrayIcon className="w-6 h-6" />
+            <button onClick={handleDownloadPdf} disabled={isDownloading} className="p-2 text-gray-600 hover:bg-gray-100 rounded-full transition-all">
+               <ArrowDownTrayIcon className={`w-6 h-6 ${isDownloading ? 'animate-pulse text-indigo-500' : ''}`} />
             </button>
             <button onClick={handleCopyLink} className="p-2 text-gray-600 hover:bg-gray-100 rounded-full">
                <ShareIcon className="w-6 h-6" />
@@ -89,16 +74,6 @@ const ViewInvoice: React.FC = () => {
 
       <div className="max-w-5xl mx-auto pt-8 px-4 flex flex-col md:flex-row gap-8">
           <div className="flex-1 space-y-6">
-             {aiSummary && (
-               <div className="bg-gradient-to-r from-indigo-500 to-purple-600 p-[1px] rounded-2xl shadow-lg animate-fade-in">
-                  <div className="bg-white p-6 rounded-[15px]">
-                     <div className="flex items-center gap-2 mb-2 text-indigo-600 font-bold text-sm">
-                        <SparklesIcon className="w-4 h-4" /> AI Personalized Note
-                     </div>
-                     <p className="text-gray-700 italic">"{aiSummary}"</p>
-                  </div>
-               </div>
-             )}
              <div id="invoice-content" className="bg-white rounded-xl shadow-sm overflow-hidden">
                 <InvoicePreview invoice={invoice} />
              </div>
