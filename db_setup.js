@@ -1,9 +1,8 @@
-require('dotenv').config();
-const mysql = require('mysql2/promise');
+import 'dotenv/config';
+import mysql from 'mysql2/promise';
 
-// Configuration from .env
 const dbConfig = {
-    host: process.env.DB_SERVER,
+    host: process.env.DB_SERVER || 'localhost',
     user: process.env.DB_USER,
     password: process.env.DB_PASSWORD,
     database: process.env.DB_NAME,
@@ -11,20 +10,20 @@ const dbConfig = {
 };
 
 async function setupDatabase() {
-    console.log("🚀 Starting Database Setup...");
-    console.log(`   Target Server: ${dbConfig.host}`);
-    console.log(`   Target Database: ${dbConfig.database}`);
+    console.log("🚀 Starting Production Database Setup...");
+    
+    if (!dbConfig.user || !dbConfig.database) {
+        console.error("❌ ERROR: Missing database credentials in .env");
+        process.exit(1);
+    }
 
     let connection;
 
     try {
-        console.log("   Connecting to MySQL server...");
         connection = await mysql.createConnection(dbConfig);
-        console.log("   ✅ Connected successfully.");
+        console.log("✅ Connected to database.");
 
-        console.log("   Setting up tables...");
-
-        // Users Table for Authentication
+        // Users
         await connection.query(`
             CREATE TABLE IF NOT EXISTS Users (
                 ID VARCHAR(50) PRIMARY KEY,
@@ -33,16 +32,14 @@ async function setupDatabase() {
                 Name VARCHAR(100)
             )
         `);
-        console.log("   ✅ Table 'Users' ensured.");
 
-        // Seed initial admin user if not exists
+        // Seed admin if empty
         await connection.query(`
             INSERT IGNORE INTO Users (ID, Email, Password, Name) 
             VALUES ('u_admin_01', 'admin@paylink.com', 'admin123', 'Administrator')
         `);
-        console.log("   ✅ Initial admin user seeded.");
 
-        // Invoices Table
+        // Invoices
         await connection.query(`
             CREATE TABLE IF NOT EXISTS Invoices (
                 ID VARCHAR(50) PRIMARY KEY,
@@ -61,15 +58,9 @@ async function setupDatabase() {
                 SellerEmail VARCHAR(100),
                 SellerPhone VARCHAR(50),
                 BuyerName VARCHAR(100),
-                BuyerContactPerson VARCHAR(100),
                 BuyerEmail VARCHAR(100),
                 BuyerPhone VARCHAR(50),
                 BuyerAddress TEXT,
-                BuyerShippingAddress TEXT,
-                PlaceOfSupply VARCHAR(100),
-                BuyerPinCode VARCHAR(20),
-                ResourceSection VARCHAR(100),
-                ResourceName VARCHAR(100),
                 Subtotal DECIMAL(18, 2) DEFAULT 0,
                 TaxRate DECIMAL(5, 2) DEFAULT 0,
                 TaxAmount DECIMAL(18, 2) DEFAULT 0,
@@ -80,19 +71,6 @@ async function setupDatabase() {
                 Notes TEXT
             )
         `);
-        
-        // Attempt to add/modify columns if they exist (Migration for dev)
-        try { await connection.query("ALTER TABLE Invoices ADD COLUMN BuyerContactPerson VARCHAR(100)"); } catch(e) {}
-        try { await connection.query("ALTER TABLE Invoices ADD COLUMN BuyerShippingAddress TEXT"); } catch(e) {}
-        try { await connection.query("ALTER TABLE Invoices ADD COLUMN PlaceOfSupply VARCHAR(100)"); } catch(e) {}
-        try { await connection.query("ALTER TABLE Invoices ADD COLUMN BuyerPinCode VARCHAR(20)"); } catch(e) {}
-        try { await connection.query("ALTER TABLE Invoices ADD COLUMN PaidInvoiceNumber VARCHAR(50)"); } catch(e) {}
-        
-        // Migrate Date columns to DATETIME
-        try { await connection.query("ALTER TABLE Invoices MODIFY COLUMN Date DATETIME"); } catch(e) {}
-        try { await connection.query("ALTER TABLE Invoices MODIFY COLUMN DueDate DATETIME"); } catch(e) {}
-
-        console.log("   ✅ Table 'Invoices' ensured.");
 
         // LineItems
         await connection.query(`
@@ -107,7 +85,6 @@ async function setupDatabase() {
                 FOREIGN KEY (InvoiceID) REFERENCES Invoices(ID) ON DELETE CASCADE
             )
         `);
-        console.log("   ✅ Table 'LineItems' ensured.");
 
         // Products
         await connection.query(`
@@ -118,31 +95,18 @@ async function setupDatabase() {
                 Rate DECIMAL(18, 2) DEFAULT 0
             )
         `);
-        console.log("   ✅ Table 'Products' ensured.");
 
         // Customers
         await connection.query(`
             CREATE TABLE IF NOT EXISTS Customers (
                 ID VARCHAR(50) PRIMARY KEY,
                 Name VARCHAR(100),
-                ContactPerson VARCHAR(100),
                 Email VARCHAR(100),
                 Phone VARCHAR(50),
                 Address TEXT,
-                ShippingAddress TEXT,
-                Gstin VARCHAR(50),
-                PlaceOfSupply VARCHAR(50),
-                PinCode VARCHAR(20)
+                Gstin VARCHAR(50)
             )
         `);
-        
-        // Migration for Customers
-        try { await connection.query("ALTER TABLE Customers ADD COLUMN ContactPerson VARCHAR(100)"); } catch(e) {}
-        try { await connection.query("ALTER TABLE Customers ADD COLUMN ShippingAddress TEXT"); } catch(e) {}
-        try { await connection.query("ALTER TABLE Customers ADD COLUMN PlaceOfSupply VARCHAR(50)"); } catch(e) {}
-        try { await connection.query("ALTER TABLE Customers ADD COLUMN PinCode VARCHAR(20)"); } catch(e) {}
-
-        console.log("   ✅ Table 'Customers' ensured.");
 
         // SellerProfile
         await connection.query(`
@@ -158,18 +122,11 @@ async function setupDatabase() {
                 BrandColor VARCHAR(20) DEFAULT '#4f46e5'
             )
         `);
-        console.log("   ✅ Table 'SellerProfile' ensured.");
 
-        console.log("\n🎉 Setup Complete! You can now run 'node server.js'.");
+        console.log("🎉 Database Setup Complete!");
 
     } catch (err) {
-        console.error("\n❌ Error setting up database:", err.message);
-        console.log("---------------------------------------------------");
-        console.log("troubleshooting Hostinger Connections:");
-        console.log("1. Ensure you created the Database in Hostinger Panel.");
-        console.log("2. Ensure you added your IP (or %) in 'Remote MySQL' in Hostinger.");
-        console.log("3. Check .env file values.");
-        console.log("---------------------------------------------------");
+        console.error("❌ Setup failed:", err.message);
     } finally {
         if (connection) await connection.end();
     }

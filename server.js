@@ -35,9 +35,9 @@ const dbConfig = {
 const pool = mysql.createPool(dbConfig);
 
 // --- AI Initialization ---
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+const getAI = () => new GoogleGenAI({ apiKey: process.env.API_KEY });
 
-// --- Helper: Generate Next Paid Invoice Number ---
+// --- Helpers ---
 async function generatePaidInvoiceNumber() {
     try {
         const [rows] = await pool.query("SELECT COUNT(*) as count FROM Invoices WHERE PaidInvoiceNumber IS NOT NULL AND PaidInvoiceNumber != ''");
@@ -52,7 +52,7 @@ function toMysqlDateTime(isoString) {
     if (!isoString) isoString = new Date().toISOString();
     try {
         const d = new Date(isoString);
-        const istOffset = 19800000; // 5.5h
+        const istOffset = 19800000; 
         const istDate = new Date(d.getTime() + istOffset);
         return istDate.getUTCFullYear() + '-' +
             String(istDate.getUTCMonth() + 1).padStart(2, '0') + '-' +
@@ -67,27 +67,29 @@ function toMysqlDateTime(isoString) {
 
 // --- API Routes ---
 
-// AI Summary Generation
+// Gemini AI Summary
 app.post('/api/ai/summarize', async (req, res) => {
     const { invoiceData } = req.body;
     try {
+        const ai = getAI();
         const prompt = `Act as a professional financial assistant for ${invoiceData.businessName}. 
-        Write a very short, polite, and friendly 2-sentence summary/note for a customer named ${invoiceData.buyerName} 
+        Write a short, polite, and friendly 2-sentence summary note for a customer named ${invoiceData.buyerName} 
         regarding their ${invoiceData.type.toLowerCase()} #${invoiceData.invoiceNumber} for a total of ${invoiceData.total} ${invoiceData.currency}. 
-        Items include: ${invoiceData.items.map(i => i.name).join(', ')}. Do not use markdown, just plain text.`;
+        Mention the items: ${invoiceData.items.map(i => i.name).join(', ')}. No markdown.`;
 
-        const result = await ai.models.generateContent({
+        const response = await ai.models.generateContent({
             model: 'gemini-3-flash-preview',
             contents: prompt,
         });
 
-        res.json({ text: result.text });
+        res.json({ text: response.text });
     } catch (err) {
-        console.error('AI Error:', err);
-        res.status(500).json({ error: 'Failed to generate summary' });
+        console.error('Gemini AI Error:', err);
+        res.status(500).json({ error: 'AI generation failed' });
     }
 });
 
+// Authentication
 app.post('/api/login', async (req, res) => {
     const { email, password } = req.body;
     try {
@@ -95,14 +97,14 @@ app.post('/api/login', async (req, res) => {
         if (rows.length > 0) {
             res.json({ success: true, user: { id: rows[0].ID, name: rows[0].Name, email: rows[0].Email } });
         } else {
-            res.status(401).json({ error: 'Invalid credentials' });
+            res.status(401).json({ error: 'Invalid email or password' });
         }
     } catch (err) {
-        res.status(500).json({ error: 'Auth error' });
+        res.status(500).json({ error: 'Server authentication error' });
     }
 });
 
-// Products & Customers (Standard CRUD)
+// Products
 app.get('/api/products', async (req, res) => {
     const [rows] = await pool.query('SELECT ID as id, Name as name, Description as description, Rate as rate FROM Products');
     res.json(rows);
@@ -114,6 +116,7 @@ app.post('/api/products', async (req, res) => {
     res.json({ success: true });
 });
 
+// Customers
 app.get('/api/customers', async (req, res) => {
     const [rows] = await pool.query('SELECT ID as id, Name as name, Email as email, Phone as phone, Address as address, Gstin as gstin FROM Customers');
     res.json(rows);
@@ -125,6 +128,35 @@ app.post('/api/customers', async (req, res) => {
     res.json({ success: true });
 });
 
+// Settings / Seller Profile
+app.get('/api/settings/seller', async (req, res) => {
+    try {
+        const [rows] = await pool.query('SELECT * FROM SellerProfile LIMIT 1');
+        if (rows.length === 0) return res.json({});
+        res.json(rows[0]);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.post('/api/settings/seller', async (req, res) => {
+    const s = req.body;
+    try {
+        await pool.query(`
+            INSERT INTO SellerProfile (ID, SellerName, BusinessName, SellerAddress, SellerGstin, SellerEmail, SellerPhone, LogoUrl, BrandColor)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ON DUPLICATE KEY UPDATE SellerName=?, BusinessName=?, SellerAddress=?, SellerGstin=?, SellerEmail=?, SellerPhone=?, LogoUrl=?, BrandColor=?
+        `, [
+            'SINGLE_PROFILE', s.sellerName, s.businessName, s.sellerAddress, s.sellerGstin, s.sellerEmail, s.sellerPhone, s.logoUrl, s.brandColor,
+            s.sellerName, s.businessName, s.sellerAddress, s.sellerGstin, s.sellerEmail, s.sellerPhone, s.logoUrl, s.brandColor
+        ]);
+        res.json({ success: true });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// Invoices
 app.get('/api/invoices', async (req, res) => {
     const [rows] = await pool.query('SELECT * FROM Invoices ORDER BY Date DESC');
     res.json(rows);
@@ -136,6 +168,15 @@ app.get('/api/invoices/:id', async (req, res) => {
     const [items] = await pool.query('SELECT ID as id, ItemName as name, Description as description, Quantity as quantity, Rate as rate, Amount as amount FROM LineItems WHERE InvoiceID = ?', [req.params.id]);
     invoices[0].items = items;
     res.json(invoices[0]);
+});
+
+app.delete('/api/invoices/:id', async (req, res) => {
+    try {
+        await pool.query('DELETE FROM Invoices WHERE ID = ?', [req.params.id]);
+        res.json({ success: true });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
 });
 
 app.post('/api/invoices', async (req, res) => {
@@ -153,10 +194,10 @@ app.post('/api/invoices', async (req, res) => {
         await connection.query(`
             INSERT INTO Invoices (ID, InvoiceNumber, PaidInvoiceNumber, Type, Date, DueDate, Template, BrandColor, LogoUrl, SellerName, BusinessName, SellerAddress, SellerGstin, SellerEmail, SellerPhone, BuyerName, BuyerEmail, BuyerPhone, BuyerAddress, Subtotal, TaxRate, TaxAmount, Total, Currency, Status, PaymentGateway, Notes)
             VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
-            ON DUPLICATE KEY UPDATE InvoiceNumber=?, PaidInvoiceNumber=?, Type=?, Date=?, DueDate=?, Status=?, PaymentGateway=?
+            ON DUPLICATE KEY UPDATE InvoiceNumber=?, PaidInvoiceNumber=?, Type=?, Date=?, DueDate=?, Status=?, PaymentGateway=?, Notes=?
         `, [
             inv.id, inv.invoiceNumber, inv.paidInvoiceNumber, inv.type, sqlDate, sqlDueDate, inv.template, inv.brandColor, inv.logoUrl, inv.sellerName, inv.businessName, inv.sellerAddress, inv.sellerGstin, inv.sellerEmail, inv.sellerPhone, inv.buyerName, inv.buyerEmail, inv.buyerPhone, inv.buyerAddress, inv.subtotal, inv.taxRate, inv.taxAmount, inv.total, inv.currency, inv.status, inv.paymentGateway, inv.notes,
-            inv.invoiceNumber, inv.paidInvoiceNumber, inv.type, sqlDate, sqlDueDate, inv.status, inv.paymentGateway
+            inv.invoiceNumber, inv.paidInvoiceNumber, inv.type, sqlDate, sqlDueDate, inv.status, inv.paymentGateway, inv.notes
         ]);
 
         await connection.query('DELETE FROM LineItems WHERE InvoiceID = ?', [inv.id]);
@@ -165,7 +206,7 @@ app.post('/api/invoices', async (req, res) => {
             await connection.query('INSERT INTO LineItems (ID, InvoiceID, ItemName, Description, Quantity, Rate, Amount) VALUES ?', [itemValues]);
         }
         await connection.commit();
-        res.json({ success: true });
+        res.json({ success: true, paidInvoiceNumber: inv.paidInvoiceNumber });
     } catch (err) {
         await connection.rollback();
         res.status(500).json({ error: err.message });
@@ -174,17 +215,54 @@ app.post('/api/invoices', async (req, res) => {
     }
 });
 
-// --- Serving Frontend (Production) ---
+// Notifications (Email & WhatsApp Mock)
+app.post('/api/notify', async (req, res) => {
+    const { to, subject, body, attachments } = req.body;
+    console.log(`Email notification request to: ${to}, Subject: ${subject}`);
+    
+    // Stub for Nodemailer if configured
+    if (process.env.SMTP_HOST) {
+        try {
+            const transporter = nodemailer.createTransport({
+                host: process.env.SMTP_HOST,
+                port: process.env.SMTP_PORT,
+                secure: process.env.SMTP_SECURE === 'true',
+                auth: {
+                    user: process.env.SMTP_USER,
+                    pass: process.env.SMTP_PASS
+                }
+            });
+            await transporter.sendMail({
+                from: process.env.SMTP_FROM || '"Wappie Finance" <no-reply@wappie.in>',
+                to, subject, html: body, attachments
+            });
+            return res.json({ success: true, message: 'Email sent' });
+        } catch (e) {
+            console.error('SMTP Error:', e);
+            return res.status(500).json({ error: 'SMTP failed' });
+        }
+    }
+    
+    res.json({ success: true, message: 'Notification received (Mock mode - no SMTP configured)' });
+});
+
+app.post('/api/whatsapp/send', (req, res) => {
+    console.log(`WhatsApp request for: ${req.body.to}`);
+    res.json({ success: true, message: 'WhatsApp mock sent' });
+});
+
+// --- Static Frontend Serving (Production Only) ---
 const distPath = path.join(__dirname, 'dist');
 app.use(express.static(distPath));
 
-// Catch-all route to serve the built index.html for React Router
 app.get('*', (req, res) => {
     if (!req.path.startsWith('/api')) {
         res.sendFile(path.join(distPath, 'index.html'));
+    } else {
+        res.status(404).json({ error: 'API route not found' });
     }
 });
 
 app.listen(PORT, () => {
-    console.log(`🚀 Production Server running on port ${PORT}`);
+    console.log(`🚀 Server running on port ${PORT}`);
 });

@@ -1,5 +1,5 @@
-const { spawn } = require('child_process');
-const fs = require('fs');
+import { spawn } from 'child_process';
+import fs from 'fs';
 
 // Colors for console output
 const RESET = '\x1b[0m';
@@ -28,7 +28,7 @@ const startProcess = (name, color, script) => {
   const child = spawn(npmCmd, ['run', script], {
     shell: true,
     stdio: 'pipe',
-    env: { ...process.env, FORCE_COLOR: true } // Force color output for child processes
+    env: { ...process.env, FORCE_COLOR: true } 
   });
 
   child.stdout.on('data', (data) => {
@@ -46,8 +46,10 @@ const startProcess = (name, color, script) => {
   });
 
   child.on('close', (code) => {
-    console.log(`${color}[${name}] exited with code ${code}${RESET}`);
-    process.exit(code);
+    if (code !== 0 && code !== null) {
+        console.log(`${color}[${name}] exited with code ${code}${RESET}`);
+        process.exit(code);
+    }
   });
 
   return child;
@@ -58,6 +60,7 @@ console.log(GREEN + '🚀 Starting PayLink (Frontend + Backend)' + RESET);
 console.log(GREEN + '-----------------------------------------------------' + RESET);
 
 const backend = startProcess('BACKEND', BLUE, 'server');
+
 // Give backend a small head start to bind ports
 setTimeout(() => {
     const frontend = startProcess('FRONTEND', GREEN, 'client');
@@ -71,4 +74,4 @@ setTimeout(() => {
 
     process.on('SIGINT', killChildren);
     process.on('SIGTERM', killChildren);
-}, 1000);
+}, 1500);
