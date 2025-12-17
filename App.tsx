@@ -1,7 +1,5 @@
-
 import React from 'react';
-// Changed import from 'react-router-dom' to 'react-router' to fix v7 export errors
-import { HashRouter, Routes, Route, Navigate, useLocation } from 'react-router';
+import { HashRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import CreateInvoice from './pages/CreateInvoice';
 import ViewInvoice from './pages/ViewInvoice';
 import Dashboard from './pages/Dashboard';

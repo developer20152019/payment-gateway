@@ -24,26 +24,6 @@ async function setupDatabase() {
 
         console.log("   Setting up tables...");
 
-        // Users Table
-        await connection.query(`
-            CREATE TABLE IF NOT EXISTS Users (
-                ID VARCHAR(50) PRIMARY KEY,
-                Email VARCHAR(100) UNIQUE NOT NULL,
-                Password VARCHAR(255) NOT NULL,
-                Name VARCHAR(100)
-            )
-        `);
-        
-        // Seed default user if none exist
-        const [users] = await connection.query("SELECT COUNT(*) as count FROM Users");
-        if (users[0].count === 0) {
-            console.log("   Seeding default admin user...");
-            await connection.query(
-                "INSERT INTO Users (ID, Email, Password, Name) VALUES (?, ?, ?, ?)",
-                ['usr_admin', 'admin@paylink.com', 'admin123', 'Administrator']
-            );
-        }
-
         // Invoices Table
         await connection.query(`
             CREATE TABLE IF NOT EXISTS Invoices (
@@ -83,12 +63,14 @@ async function setupDatabase() {
             )
         `);
         
+        // Attempt to add/modify columns if they exist (Migration for dev)
         try { await connection.query("ALTER TABLE Invoices ADD COLUMN BuyerContactPerson VARCHAR(100)"); } catch(e) {}
         try { await connection.query("ALTER TABLE Invoices ADD COLUMN BuyerShippingAddress TEXT"); } catch(e) {}
         try { await connection.query("ALTER TABLE Invoices ADD COLUMN PlaceOfSupply VARCHAR(100)"); } catch(e) {}
         try { await connection.query("ALTER TABLE Invoices ADD COLUMN BuyerPinCode VARCHAR(20)"); } catch(e) {}
         try { await connection.query("ALTER TABLE Invoices ADD COLUMN PaidInvoiceNumber VARCHAR(50)"); } catch(e) {}
         
+        // Migrate Date columns to DATETIME
         try { await connection.query("ALTER TABLE Invoices MODIFY COLUMN Date DATETIME"); } catch(e) {}
         try { await connection.query("ALTER TABLE Invoices MODIFY COLUMN DueDate DATETIME"); } catch(e) {}
 
@@ -136,6 +118,7 @@ async function setupDatabase() {
             )
         `);
         
+        // Migration for Customers
         try { await connection.query("ALTER TABLE Customers ADD COLUMN ContactPerson VARCHAR(100)"); } catch(e) {}
         try { await connection.query("ALTER TABLE Customers ADD COLUMN ShippingAddress TEXT"); } catch(e) {}
         try { await connection.query("ALTER TABLE Customers ADD COLUMN PlaceOfSupply VARCHAR(50)"); } catch(e) {}
@@ -163,6 +146,12 @@ async function setupDatabase() {
 
     } catch (err) {
         console.error("\n❌ Error setting up database:", err.message);
+        console.log("---------------------------------------------------");
+        console.log("troubleshooting Hostinger Connections:");
+        console.log("1. Ensure you created the Database in Hostinger Panel.");
+        console.log("2. Ensure you added your IP (or %) in 'Remote MySQL' in Hostinger.");
+        console.log("3. Check .env file values.");
+        console.log("---------------------------------------------------");
     } finally {
         if (connection) await connection.end();
     }

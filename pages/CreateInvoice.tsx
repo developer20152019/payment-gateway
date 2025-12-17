@@ -1,7 +1,5 @@
-
 import React, { useEffect, useState } from 'react';
-// Changed import from 'react-router-dom' to 'react-router' to fix v7 export errors
-import { useParams, useNavigate } from 'react-router';
+import { useParams, useNavigate } from 'react-router-dom';
 import { InvoiceData, LineItem, PaymentStatus, Product, DocumentType, Customer } from '../types';
 import { PhotoIcon, PlusIcon, TrashIcon, DocumentTextIcon, ArrowPathIcon, ChevronLeftIcon, CheckCircleIcon, ChatBubbleLeftRightIcon, EyeIcon, UserPlusIcon, XMarkIcon } from '@heroicons/react/24/outline';
 import { InvoiceService } from '../services/invoiceService';
@@ -625,7 +623,7 @@ const CreateInvoice: React.FC = () => {
                                         onClick={() => handleCustomerSelect(c)}
                                     >
                                         <div className="font-bold text-gray-800">{c.name}</div>
-                                        <div className="text-gray-505 text-xs">{c.email}</div>
+                                        <div className="text-gray-500 text-xs">{c.email}</div>
                                     </div>
                                 ))}
                                 {customers.length > 0 && customers.filter(c => c.name.toLowerCase().includes((invoice.buyerName || '').toLowerCase())).length === 0 && (

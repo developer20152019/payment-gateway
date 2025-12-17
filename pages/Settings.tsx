@@ -1,7 +1,5 @@
-
 import React, { useEffect, useState } from 'react';
-// Changed import from 'react-router-dom' to 'react-router' to fix v7 export errors
-import { useNavigate } from 'react-router';
+import { useNavigate } from 'react-router-dom';
 import { SellerProfile } from '../types';
 import { SettingsService } from '../services/settingsService';
 import { ChevronLeftIcon, PhotoIcon, CheckCircleIcon } from '@heroicons/react/24/outline';

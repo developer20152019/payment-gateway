@@ -1,7 +1,5 @@
-
 import React, { useEffect, useState, useMemo } from 'react';
-// Changed import from 'react-router-dom' to 'react-router' to fix v7 export errors
-import { useNavigate } from 'react-router';
+import { useNavigate } from 'react-router-dom';
 import { InvoiceData, PaymentStatus, DocumentType } from '../types';
 import { InvoiceService } from '../services/invoiceService';
 import { PlusIcon, DocumentTextIcon, TrashIcon, MagnifyingGlassIcon, LinkIcon, CheckIcon, XMarkIcon, ArrowUpIcon, ArrowDownIcon, BanknotesIcon, PencilIcon, TagIcon, ClipboardDocumentListIcon, UsersIcon, Cog6ToothIcon, MapPinIcon, ArrowRightOnRectangleIcon, CalendarIcon, ClockIcon, ChevronDownIcon, FunnelIcon } from '@heroicons/react/24/outline';
