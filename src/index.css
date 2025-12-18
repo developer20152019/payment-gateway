@@ -1,0 +1,34 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Global base fix */
+html {
+  font-size: 16px;
+}
+
+body {
+  font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+  background-color: #f3f4f6;
+  margin: 0;
+}
+
+/* Utility classes */
+.invoice-shadow {
+  box-shadow: 0 4px 24px rgba(0,0,0,0.06);
+}
+
+/* Print styles */
+@media print {
+  .no-print {
+    display: none !important;
+  }
+  body {
+    background-color: white;
+  }
+  .invoice-container {
+    box-shadow: none;
+    border: none;
+    padding: 0;
+  }
+}

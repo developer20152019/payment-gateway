@@ -15,21 +15,29 @@ const INDIAN_STATES = [
   "Dadra and Nagar Haveli and Daman and Diu", "Delhi", "Jammu and Kashmir", "Ladakh", "Lakshadweep", "Puducherry"
 ];
 
-const RESOURCE_SECTIONS = [
-    "Google",
-    "Facebook",
-    "Linkedin",
-    "Cold Calling",
-    "Website",
-    "Recharge",
-    "Reference"
+// 1. Helper function to parse .env arrays
+const getEnvArray = (key: string, defaultArray: string[]) => {
+  const envValue = import.meta.env[key];
+  if (envValue) {
+    // Split by comma and trim whitespace around names
+    return envValue.split(',').map((item: string) => item.trim());
+  }
+  return defaultArray;
+};
+
+// 2. Define Defaults (Fallbacks in case .env is missing)
+const DEFAULT_SECTIONS = [
+    "Google", "Facebook", "Linkedin", "Cold Calling", 
+    "Website", "Recharge", "Reference"
 ];
 
-const RESOURCE_NAMES = [
-  "Swapan Dutta", 
-  "Sharbhashish Nayak", 
-  "Dipraj Nath"
+const DEFAULT_NAMES = [
+  "Swapan Dutta", "Sharbhashish Nayak", "Dipraj Nath"
 ];
+
+// 3. Initialize Constants using the helper
+const RESOURCE_SECTIONS = getEnvArray('VITE_RESOURCE_SECTIONS', DEFAULT_SECTIONS);
+const RESOURCE_NAMES = getEnvArray('VITE_RESOURCE_NAMES', DEFAULT_NAMES);
 
 const generateInvoiceNumber = () => {
   const date = new Date();
@@ -385,42 +393,85 @@ const CreateInvoice: React.FC = () => {
     return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
   };
 
+//   const handleSubmit = async (e: React.FormEvent, docType: DocumentType) => {
+//     e.preventDefault();
+    
+//     const missingFields: string[] = [];
+
+//     if (!invoice.invoiceNumber) missingFields.push("Reference Number");
+//     if (!invoice.date) missingFields.push("Date");
+//     if (docType === 'INVOICE' && !invoice.dueDate) missingFields.push("Due Date");
+//     if (!invoice.buyerName) missingFields.push("Client Name");
+
+//     // Require Email for Invoices to ensure sending works
+//     if (docType === 'INVOICE' && !invoice.buyerEmail) {
+//         missingFields.push("Client Email Address (Required for sending)");
+//     } else if (invoice.buyerEmail && !isValidEmail(invoice.buyerEmail)) {
+//         missingFields.push("Valid Client Email Address");
+//     }
+
+//     if (docType === 'INVOICE' && !invoice.paymentGateway) {
+//         missingFields.push("Payment Gateway");
+//     }
+
+//     if (!invoice.resourceSection) missingFields.push("Resource Section");
+//     if (!invoice.resourceName) missingFields.push("Resource Name");
+
+//     let itemsValid = true;
+//     invoice.items.forEach((item) => {
+//         if (!item.name || item.name.trim() === '') {
+//             itemsValid = false;
+//         }
+//     });
+//     if (!itemsValid) {
+//         missingFields.push("All items must have a name");
+//     }
+
+//     if (missingFields.length > 0) {
+//         alert(`Please correct the following before saving:\n\n- ${missingFields.join('\n- ')}`);
+//         return;
+//     }
+
+//     setIsSaving(true);
+//     try {
+//         const invoiceToSave = { ...invoice, type: docType };
+        
+//         // Save to Backend/Storage
+//         await InvoiceService.saveInvoice(invoiceToSave);
+        
+//         // Redirect to View Invoice page and trigger email/share workflow
+//         navigate(`/view/${invoiceToSave.id}`, { 
+//             state: { 
+//                 autoSendEmail: true,
+//                 openShare: true 
+//             } 
+//         });
+        
+//     } catch (error) {
+//         console.error("Failed to save:", error);
+//         alert("An error occurred while saving the document.");
+//     } finally {
+//         setIsSaving(false);
+//     }
+//   };
+// Replaces the existing handleSubmit function
   const handleSubmit = async (e: React.FormEvent, docType: DocumentType) => {
     e.preventDefault();
     
+    // 1. Basic Validation
     const missingFields: string[] = [];
-
-    if (!invoice.invoiceNumber) missingFields.push("Reference Number");
-    if (!invoice.date) missingFields.push("Date");
-    if (docType === 'INVOICE' && !invoice.dueDate) missingFields.push("Due Date");
     if (!invoice.buyerName) missingFields.push("Client Name");
-
-    // Require Email for Invoices to ensure sending works
-    if (docType === 'INVOICE' && !invoice.buyerEmail) {
-        missingFields.push("Client Email Address (Required for sending)");
-    } else if (invoice.buyerEmail && !isValidEmail(invoice.buyerEmail)) {
-        missingFields.push("Valid Client Email Address");
-    }
-
-    if (docType === 'INVOICE' && !invoice.paymentGateway) {
-        missingFields.push("Payment Gateway");
-    }
-
-    if (!invoice.resourceSection) missingFields.push("Resource Section");
-    if (!invoice.resourceName) missingFields.push("Resource Name");
-
-    let itemsValid = true;
-    invoice.items.forEach((item) => {
-        if (!item.name || item.name.trim() === '') {
-            itemsValid = false;
+    if (!invoice.items.length) missingFields.push("Items");
+    
+    // Validate Contact Info for sending
+    if ((docType === 'INVOICE' || docType === 'QUOTATION') && (!invoice.buyerEmail && !invoice.buyerPhone)) {
+        if(!confirm("Client has no Email or Phone. You won't be able to send notifications. Continue?")) {
+            return;
         }
-    });
-    if (!itemsValid) {
-        missingFields.push("All items must have a name");
     }
 
     if (missingFields.length > 0) {
-        alert(`Please correct the following before saving:\n\n- ${missingFields.join('\n- ')}`);
+        alert(`Missing: ${missingFields.join(', ')}`);
         return;
     }
 
@@ -428,25 +479,28 @@ const CreateInvoice: React.FC = () => {
     try {
         const invoiceToSave = { ...invoice, type: docType };
         
-        // Save to Backend/Storage
+        // 2. Save
         await InvoiceService.saveInvoice(invoiceToSave);
         
-        // Redirect to View Invoice page and trigger email/share workflow
-        navigate(`/view/${invoiceToSave.id}`, { 
-            state: { 
-                autoSendEmail: true,
-                openShare: true 
-            } 
-        });
+        // 3. Navigate with correct State
+        // The timeout helps ensure the DB write completes before we try to read it in ViewInvoice
+        setTimeout(() => {
+            navigate(`/view/${invoiceToSave.id}`, { 
+                state: { 
+                    autoSendEmail: true, // This triggers the useEffect in ViewInvoice
+                    emailType: 'CREATED',
+                    openShare: true 
+                } 
+            });
+        }, 200);
         
     } catch (error) {
         console.error("Failed to save:", error);
-        alert("An error occurred while saving the document.");
+        alert("An error occurred while saving.");
     } finally {
         setIsSaving(false);
     }
   };
-
   if (isLoading) {
       return (
           <div className="min-h-screen flex items-center justify-center bg-gray-50">

@@ -1,4 +1,5 @@
-import { InvoiceData, PaymentStatus, PaymentGateway } from '../types';
+import { InvoiceData, PaymentStatus, PaymentGateway } from '@types';
+
 
 // Use relative path to allow Vite proxy to handle the request destination.
 // This fixes "Failed to fetch" when accessing via network IP (e.g. mobile testing) 
