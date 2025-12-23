@@ -3,7 +3,9 @@
   "version": "1.0.0",
   "description": "PayLink Invoice Generator (React + Node.js)",
   "main": "server.js",
+  "private": true,
   "scripts": {
+    "preinstall": "npm cache clean --force",
     "start": "node server.js",
     "server": "node server.js",
     "client": "vite",
@@ -39,6 +41,7 @@
     "vite": "^5.2.0"
   },
   "engines": {
-    "node": ">=14.0.0"
+    "node": "18.x",
+    "npm": ">=9.0.0"
   }
 }
