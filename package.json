@@ -9,6 +9,7 @@
     "client": "vite",
     "client:build": "vite build",
     "client:preview": "vite preview",
+    "build": "npm run client:build",
     "dev": "node dev-runner.js"
   },
   "dependencies": {
