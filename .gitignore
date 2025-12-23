@@ -83,4 +83,4 @@ typings/
 .vscode/
 
 # PayLink specifics
-dist/
+#dist/
