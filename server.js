@@ -13,8 +13,8 @@ const PORT = process.env.PORT || 3000;
 
 // --- Middleware ---
 app.use(cors());
-app.use(express.json({ limit: '50mb' }));
-app.use(express.urlencoded({ extended: true, limit: '50mb' }));
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 
 // --- Database Connection ---
 const dbConfig = {
@@ -111,29 +111,61 @@ const ccav = {
 };
 
 // --- API Routes ---
+/* ---------------- HEALTH CHECK API ---------------- */
+app.get('/api/health', async (req, res) => {
+    const health = {
+        server: 'UP',
+        database: 'DOWN',
+        timestamp: new Date().toISOString(),
+        environment: process.env.NODE_ENV || 'development'
+    };
 
+    try {
+        // Simple DB ping
+        const conn = await pool.getConnection();
+        await conn.query('SELECT 1');
+        conn.release();
+
+        health.database = 'UP';
+
+        return res.status(200).json(health);
+    } catch (err) {
+        console.error('Health DB Check Failed:', err.message);
+        return res.status(500).json(health);
+    }
+});
 // 0. AUTHENTICATION
 app.post('/api/login', async (req, res) => {
     const { email, password } = req.body;
-    if (!email || !password) return res.status(400).json({ error: 'Email and Password required' });
+
+    if (!email || !password) {
+        return res.status(400).json({ error: 'Email and password required' });
+    }
 
     try {
         const [rows] = await pool.query(
-            'SELECT ID, Email, Name FROM Users WHERE Email = ? AND Password = ?', 
+            'SELECT ID, Name, Email FROM Users WHERE Email = ? AND Password = ?',
             [email, password]
         );
-        if (rows.length > 0) {
-            const user = rows[0];
-            res.json({ success: true, user: { id: user.ID, name: user.Name, email: user.Email } });
-        } else {
-            res.status(401).json({ error: 'Invalid credentials' });
+
+        if (!rows.length) {
+            return res.status(401).json({ error: 'Invalid credentials' });
         }
+
+        const user = rows[0];
+        res.json({
+            success: true,
+            user: {
+                id: user.ID,
+                name: user.Name,
+                email: user.Email
+            }
+        });
     } catch (err) {
         console.error('Login Error:', err);
-        res.status(500).json({ error: 'Internal server error' });
+        res.status(500).json({ error: 'Server error' });
     }
 });
-
 // 1. PRODUCTS
 app.get('/api/products', async (req, res) => {
     try {
@@ -471,12 +503,14 @@ app.post('/api/payment/ccavResponseHandler', async (req, res) => {
     res.send(htmlResponse);
 });
 
-// Serve Vite build
+/* ---------------- SERVE FRONTEND ---------------- */
 app.use(express.static(path.join(__dirname, 'dist')));
+
 app.get('*', (req, res) => {
-  res.sendFile(path.join(__dirname, 'dist', 'index.html'));
+    res.sendFile(path.join(__dirname, 'dist', 'index.html'));
 });
 
+/* ---------------- START SERVER ---------------- */
 app.listen(PORT, () => {
-  console.log(`🚀 Server running on http://localhost:${PORT}`);
+    console.log(`🚀 Server running on port ${PORT}`);
 });

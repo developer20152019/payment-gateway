@@ -3,98 +3,84 @@ import { useNavigate } from 'react-router-dom';
 import { LockClosedIcon, DocumentTextIcon } from '@heroicons/react/24/outline';
 
 const Login: React.FC = () => {
-  const navigate = useNavigate();
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [error, setError] = useState('');
+    const navigate = useNavigate();
 
-  const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError('');
+    const [email, setEmail] = useState('');
+    const [password, setPassword] = useState('');
+    const [error, setError] = useState('');
 
-    try {
-      const response = await fetch('http://localhost:3000/api/login', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ email, password })
-      });
+    const handleLogin = async (e: React.FormEvent) => {
+        e.preventDefault();
+        setError('');
 
-      const data = await response.json();
+        try {
+            const res = await fetch('/api/login', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email, password })
+            });
 
-      if (!response.ok) {
-        setError(data.message || 'Invalid credentials');
-        return;
-      }
+            const data = await res.json();
 
-      // ✅ Login success
-      localStorage.setItem('isAuthenticated', 'true');
-      localStorage.setItem('user', JSON.stringify(data.user));
+            if (!res.ok) {
+                setError(data.error || 'Login failed');
+                return;
+            }
 
-      navigate('/');
-    } catch (err) {
-      setError('Server not reachable');
-    }
-  };
+            localStorage.setItem('isAuthenticated', 'true');
+            localStorage.setItem('user', JSON.stringify(data.user));
 
-  return (
-    <div className="min-h-screen bg-gray-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
-      <div className="sm:mx-auto sm:w-full sm:max-w-md">
-        <div className="flex justify-center text-indigo-600">
-          <DocumentTextIcon className="h-12 w-12" />
-        </div>
-        <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
-          Sign in to Wappie Finance
-        </h2>
-      </div>
+            navigate('/');
+        } catch {
+            setError('Server not reachable');
+        }
+    };
 
-      <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
-        <div className="bg-white py-8 px-4 shadow sm:rounded-lg sm:px-10">
-          <form className="space-y-6" onSubmit={handleLogin}>
-            <div>
-              <label className="block text-sm font-medium text-gray-700">
-                Email address
-              </label>
-              <input
-                type="email"
-                required
-                className="appearance-none block w-full px-3 py-2 border rounded-md"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-              />
+    return (
+        <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+            <div className="bg-white p-8 shadow-md rounded w-full max-w-md">
+                <div className="flex justify-center text-indigo-600 mb-4">
+                    <DocumentTextIcon className="h-10 w-10" />
+                </div>
+
+                <h2 className="text-center text-2xl font-bold mb-6">
+                    Sign in to Wappie Finance
+                </h2>
+
+                <form onSubmit={handleLogin} className="space-y-4">
+                    <input
+                        type="email"
+                        placeholder="Email"
+                        required
+                        className="w-full border px-3 py-2 rounded"
+                        value={email}
+                        onChange={e => setEmail(e.target.value)}
+                    />
+
+                    <input
+                        type="password"
+                        placeholder="Password"
+                        required
+                        className="w-full border px-3 py-2 rounded"
+                        value={password}
+                        onChange={e => setPassword(e.target.value)}
+                    />
+
+                    {error && (
+                        <div className="text-red-600 text-sm">{error}</div>
+                    )}
+
+                    <button
+                        type="submit"
+                        className="w-full bg-indigo-600 text-white py-2 rounded flex justify-center items-center gap-2"
+                    >
+                        <LockClosedIcon className="h-4 w-4" />
+                        Sign In
+                    </button>
+                </form>
             </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700">
-                Password
-              </label>
-              <input
-                type="password"
-                required
-                className="appearance-none block w-full px-3 py-2 border rounded-md"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-              />
-            </div>
-
-            {error && (
-              <div className="text-red-600 text-sm font-medium">
-                {error}
-              </div>
-            )}
-
-            <button
-              type="submit"
-              className="w-full flex justify-center py-2 px-4 rounded-md text-white bg-indigo-600 hover:bg-indigo-700 gap-2 items-center"
-            >
-              <LockClosedIcon className="w-4 h-4" /> Sign in
-            </button>
-          </form>
         </div>
-      </div>
-    </div>
-  );
+    );
 };
 
 export default Login;
