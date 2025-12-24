@@ -64,154 +64,61 @@ const ViewInvoice: React.FC = () => {
           fallbackCopy();
       }
   };
-
-  // Reusable PDF E-mailing Function
-  // const generateAndSendPDF = useCallback(async (currentInvoice: InvoiceData, triggerType: 'CREATED' | 'PAID') => {
-  //   if (!currentInvoice.buyerEmail) {
-  //       showNotification("No client email found. Notification skipped.", 'warning');
-  //       return;
-  //   }
-
-  //   setIsSendingEmail(true);
-  //   showNotification(triggerType === 'PAID' ? "Processing Payment Receipt..." : "Sending Document...", 'info');
     
-  //   // Slight delay to allow DOM to update (e.g. show PAID badge)
-  //   await new Promise(resolve => setTimeout(resolve, 1000));
+    const generateAndSendPDF = useCallback(async (currentInvoice: InvoiceData, triggerType: 'CREATED' | 'PAID') => {
+        setIsSendingEmail(true);
+        showNotification(triggerType === 'PAID' ? "Processing Payment Receipt..." : "Generating Document...", 'info');
 
-  //   const element = document.getElementById('invoice-content');
-  //   if (!element || typeof (window as any).html2pdf === 'undefined') {
-  //       console.error("PDF generation failed: Library missing or element not found");
-  //       showNotification("PDF Library missing. Please refresh.", 'error');
-  //       setIsSendingEmail(false);
-  //       return;
-  //   }
+        // Wait for the DOM to render updated invoice
+        await new Promise(resolve => setTimeout(resolve, 500));
+        const element = document.getElementById('invoice-content');
 
-  //   const opt = {
-  //       margin: 5,
-  //       filename: `${currentInvoice.paidInvoiceNumber || currentInvoice.invoiceNumber}.pdf`,
-  //       image: { type: 'jpeg', quality: 0.98 },
-  //       html2canvas: { scale: 2, useCORS: true },
-  //       jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
-  //   };
-
-  //   try {
-  //       const pdfBase64 = await (window as any).html2pdf().from(element).set(opt).outputPdf('datauristring');
-        
-  //       let emailSuccess = false;
-
-  //       // 1. Attempt Email
-  //       try {
-  //           // Updated: Pass triggerType to use the correct email template (Created vs Paid)
-  //           await InvoiceService.sendPdfByEmail(currentInvoice, pdfBase64, triggerType);
-  //           emailSuccess = true;
-  //       } catch (emailError: any) {
-  //           console.error("Email Failed:", emailError);
-  //           showNotification("Email failed. Trying WhatsApp fallback...", 'warning');
-  //       }
-        
-  //       // 2. Attempt WhatsApp (Runs if Email succeeds OR fails)
-  //       try {
-  //           if (emailSuccess) {
-  //                showNotification("Email sent. Sending WhatsApp...", 'info');
-  //           }
-            
-  //           // Pass triggerType so backend selects the correct template (inv_quote_status vs payment_rcv_inv)
-  //           await InvoiceService.sendWhatsAppNotification(currentInvoice, triggerType);
-            
-  //           if (emailSuccess) {
-  //               showNotification("Email and WhatsApp sent successfully!", 'success');
-  //           } else {
-  //               showNotification("Email failed, but WhatsApp sent!", 'success');
-  //           }
-  //       } catch (waError) {
-  //           console.error("WhatsApp Send Failed:", waError);
-  //           if (emailSuccess) {
-  //               showNotification("Email sent, but WhatsApp failed.", 'warning');
-  //           } else {
-  //               showNotification("Failed to send notifications (Email & WhatsApp).", 'error');
-  //           }
-  //       }
-        
-  //       // Show share modal after attempts
-  //       setShowShareModal(true);
-
-  //   } catch (error: any) {
-  //       console.error("PDF Generation Error:", error);
-  //       showNotification("Failed to generate PDF for sending.", 'error');
-  //       setShowShareModal(true);
-  //   } finally {
-  //       setIsSendingEmail(false);
-  //   }
-  // }, []);
-// Replaces the existing generateAndSendPDF function
-  const generateAndSendPDF = useCallback(async (currentInvoice: InvoiceData, triggerType: 'CREATED' | 'PAID') => {
-    // 1. Validation
-    if (!currentInvoice.buyerEmail) {
-        showNotification("No client email found. Notification skipped.", 'warning');
-        return;
-    }
-
-    setIsSendingEmail(true);
-    showNotification(triggerType === 'PAID' ? "Processing Payment Receipt..." : "Generating Document...", 'info');
-    
-    // 2. WAIT for the element to actually exist in the DOM
-    // We try 3 times with a delay to ensure React has rendered the InvoicePreview
-    let element = document.getElementById('invoice-content');
-    if (!element) await new Promise(r => setTimeout(r, 500));
-    element = document.getElementById('invoice-content');
-    if (!element) await new Promise(r => setTimeout(r, 500));
-    element = document.getElementById('invoice-content');
-
-    // 3. Check for Library
-    if (!element || typeof (window as any).html2pdf === 'undefined') {
-        console.error("PDF Error: Element found?", !!element, "Library found?", !!(window as any).html2pdf);
-        showNotification("PDF Library missing or View not ready. Refresh page.", 'error');
-        setIsSendingEmail(false);
-        return;
-    }
-
-    const opt = {
-        margin: 5,
-        filename: `${currentInvoice.paidInvoiceNumber || currentInvoice.invoiceNumber}.pdf`,
-        image: { type: 'jpeg', quality: 0.98 },
-        html2canvas: { scale: 2, useCORS: true, letterRendering: true },
-        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
-    };
-
-    try {
-        // 4. Generate PDF
-        const pdfBase64 = await (window as any).html2pdf().from(element).set(opt).outputPdf('datauristring');
-        
-        let emailSuccess = false;
-
-        // 5. Send Email
-        try {
-            await InvoiceService.sendPdfByEmail(currentInvoice, pdfBase64, triggerType);
-            emailSuccess = true;
-        } catch (emailError: any) {
-            console.error("Email API Failed:", emailError);
-            showNotification("Email failed. Trying WhatsApp...", 'warning');
+        if (!element || typeof (window as any).html2pdf === 'undefined') {
+            console.error("PDF error: Element or library missing");
+            showNotification("PDF generation failed. Refresh page.", 'error');
+            setIsSendingEmail(false);
+            return;
         }
-        
-        // 6. Send WhatsApp
-        try {
-            await InvoiceService.sendWhatsAppNotification(currentInvoice, triggerType);
-            showNotification(emailSuccess ? "Email & WhatsApp sent!" : "WhatsApp sent successfully!", 'success');
-        } catch (waError) {
-            console.error("WhatsApp API Failed:", waError);
-            if (!emailSuccess) showNotification("Failed to send notifications. Check API connection.", 'error');
-        }
-        
-        setShowShareModal(true);
 
-    } catch (error: any) {
-        console.error("PDF Process Error:", error);
-        showNotification("Failed to generate PDF.", 'error');
-    } finally {
-        setIsSendingEmail(false);
-    }
-  }, []);
-  // Fetch Invoice Data
+        const opt = {
+            margin: 5,
+            filename: `${currentInvoice.paidInvoiceNumber || currentInvoice.invoiceNumber}.pdf`,
+            image: { type: 'jpeg', quality: 0.98 },
+            html2canvas: { scale: 2, useCORS: true, letterRendering: true },
+            jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+        };
+
+        try {
+            const pdfBase64 = await (window as any).html2pdf().from(element).set(opt).outputPdf('datauristring');
+
+            let emailSuccess = false;
+
+            try {
+                await InvoiceService.sendPdfByEmail(currentInvoice, pdfBase64, triggerType);
+                emailSuccess = true;
+            } catch (emailError) {
+                console.warn("Email failed:", emailError);
+                showNotification("Email failed. Trying WhatsApp...", 'warning');
+            }
+
+            try {
+                await InvoiceService.sendWhatsAppNotification(currentInvoice, triggerType);
+                showNotification(emailSuccess ? "Email & WhatsApp sent!" : "WhatsApp sent successfully!", 'success');
+            } catch (waError) {
+                console.error("WhatsApp failed:", waError);
+                if (!emailSuccess) showNotification("Failed to send notifications.", 'error');
+            }
+
+            setShowShareModal(true);
+
+        } catch (error) {
+            console.error("PDF generation error:", error);
+            showNotification("Failed to generate PDF.", 'error');
+        } finally {
+            setIsSendingEmail(false);
+        }
+    }, []);
+
   const fetchInvoice = useCallback(async () => {
     if (id) {
       try {

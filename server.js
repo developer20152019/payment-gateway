@@ -26,7 +26,8 @@ const dbConfig = {
     port: process.env.DB_PORT ? Number(process.env.DB_PORT) : 3306,
     waitForConnections: true,
     connectionLimit: 10,
-    queueLimit: 0
+    queueLimit: 0,
+    timezone: '+05:30'
 };
 
 const pool = mysql.createPool(dbConfig);
@@ -57,28 +58,14 @@ async function generatePaidInvoiceNumber() {
 }
 
 // --- Helper: Format ISO String to MySQL DATETIME in IST ---
-function toMysqlDateTime(isoString) {
-    if (!isoString) isoString = new Date().toISOString();
-    try {
-        const d = new Date(isoString);
-        if (isNaN(d.getTime())) {
-            const now = new Date();
-            return toMysqlDateTime(now.toISOString());
-        }
-        // Add 5 hours 30 minutes for IST
-        const istOffset = 19800000;
-        const istDate = new Date(d.getTime() + istOffset);
-        const yyyy = istDate.getUTCFullYear();
-        const mm = String(istDate.getUTCMonth() + 1).padStart(2, '0');
-        const dd = String(istDate.getUTCDate()).padStart(2, '0');
-        const hh = String(istDate.getUTCHours()).padStart(2, '0');
-        const min = String(istDate.getUTCMinutes()).padStart(2, '0');
-        const ss = String(istDate.getUTCSeconds()).padStart(2, '0');
-        return `${yyyy}-${mm}-${dd} ${hh}:${min}:${ss}`;
-    } catch (e) {
-        console.error("Date conversion error:", e);
-        return new Date().toISOString().slice(0, 19).replace('T', ' ');
-    }
+
+function toISTMySQL(dateInput = new Date()) {
+    const d = new Date(dateInput);
+
+    // Convert UTC → IST
+    const ist = new Date(d.getTime() + (5.5 * 60 * 60 * 1000));
+
+    return ist.toISOString().slice(0, 19).replace('T', ' ');
 }
 
 // --- Payment Gateways Configuration ---
@@ -254,8 +241,8 @@ app.post('/api/invoices', async (req, res) => {
     if (inv.status === 'PAID' && (!inv.paidInvoiceNumber || inv.paidInvoiceNumber === '')) {
         inv.paidInvoiceNumber = await generatePaidInvoiceNumber();
     }
-    const sqlDate = toMysqlDateTime(inv.date);
-    const sqlDueDate = toMysqlDateTime(inv.dueDate);
+    const sqlDate = toISTMySQL(inv.date);
+    const sqlDueDate = toISTMySQL(inv.dueDate);
 
     try {
         await connection.beginTransaction();
@@ -362,7 +349,7 @@ app.post('/api/whatsapp/send', async (req, res) => {
                 name: "payment_rcv_inv",
                 language: { code: "en", policy: "deterministic" },
                 components: [
-                    { type: "header", parameters: [{ type: "document", document: { link: link, filename: "Invoice.pdf" } }] },
+                    { type: "header", parameters: [{ type: "document", document: { link: link, filename: "Invoice_from_Wappie.pdf" } }] },
                     { type: "body", parameters: [{ type: "text", text: buyerName || "Customer" }, { type: "text", text: amount.toString() }, { type: "text", text: invoiceNumber }] }
                 ]
             }

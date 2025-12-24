@@ -412,68 +412,7 @@ const CreateInvoice: React.FC = () => {
     return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
   };
 
-//   const handleSubmit = async (e: React.FormEvent, docType: DocumentType) => {
-//     e.preventDefault();
-    
-//     const missingFields: string[] = [];
-
-//     if (!invoice.invoiceNumber) missingFields.push("Reference Number");
-//     if (!invoice.date) missingFields.push("Date");
-//     if (docType === 'INVOICE' && !invoice.dueDate) missingFields.push("Due Date");
-//     if (!invoice.buyerName) missingFields.push("Client Name");
-
-//     // Require Email for Invoices to ensure sending works
-//     if (docType === 'INVOICE' && !invoice.buyerEmail) {
-//         missingFields.push("Client Email Address (Required for sending)");
-//     } else if (invoice.buyerEmail && !isValidEmail(invoice.buyerEmail)) {
-//         missingFields.push("Valid Client Email Address");
-//     }
-
-//     if (docType === 'INVOICE' && !invoice.paymentGateway) {
-//         missingFields.push("Payment Gateway");
-//     }
-
-//     if (!invoice.resourceSection) missingFields.push("Resource Section");
-//     if (!invoice.resourceName) missingFields.push("Resource Name");
-
-//     let itemsValid = true;
-//     invoice.items.forEach((item) => {
-//         if (!item.name || item.name.trim() === '') {
-//             itemsValid = false;
-//         }
-//     });
-//     if (!itemsValid) {
-//         missingFields.push("All items must have a name");
-//     }
-
-//     if (missingFields.length > 0) {
-//         alert(`Please correct the following before saving:\n\n- ${missingFields.join('\n- ')}`);
-//         return;
-//     }
-
-//     setIsSaving(true);
-//     try {
-//         const invoiceToSave = { ...invoice, type: docType };
-        
-//         // Save to Backend/Storage
-//         await InvoiceService.saveInvoice(invoiceToSave);
-        
-//         // Redirect to View Invoice page and trigger email/share workflow
-//         navigate(`/view/${invoiceToSave.id}`, { 
-//             state: { 
-//                 autoSendEmail: true,
-//                 openShare: true 
-//             } 
-//         });
-        
-//     } catch (error) {
-//         console.error("Failed to save:", error);
-//         alert("An error occurred while saving the document.");
-//     } finally {
-//         setIsSaving(false);
-//     }
-//   };
-// Replaces the existing handleSubmit function
+      
   const handleSubmit = async (e: React.FormEvent, docType: DocumentType) => {
     e.preventDefault();
     
@@ -481,7 +420,15 @@ const CreateInvoice: React.FC = () => {
     const missingFields: string[] = [];
     if (!invoice.buyerName) missingFields.push("Client Name");
     if (!invoice.items.length) missingFields.push("Items");
-    
+
+      // Payment Gateway Required ONLY for INVOICE
+      if (docType === 'INVOICE' && !invoice.paymentGateway) {
+          missingFields.push("Payment Gateway (Required for Invoice)");
+      }
+      // Validate all items have names
+      const itemsWithoutNames = invoice.items.filter(item => !item.name.trim());
+      if (itemsWithoutNames.length > 0) missingFields.push("Item must have a name");
+
     // Validate Contact Info for sending
     if ((docType === 'INVOICE' || docType === 'QUOTATION') && (!invoice.buyerEmail && !invoice.buyerPhone)) {
         if(!confirm("Client has no Email or Phone. You won't be able to send notifications. Continue?")) {
