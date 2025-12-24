@@ -304,44 +304,63 @@ const CreateInvoice: React.FC = () => {
       }
   };
 
-  const handleSaveNewCustomer = async (e: React.MouseEvent) => {
-      e.preventDefault(); 
-      
-      if (!newCustomer.name || newCustomer.name.trim() === '') {
-          alert("Customer Name is required");
-          return;
-      }
+    const handleSaveNewCustomer = async (e: React.MouseEvent) => {
+        e.preventDefault();
 
-      const custToSave: Customer = {
-          id: `cust_${Date.now()}`,
-          name: newCustomer.name.trim(),
-          email: newCustomer.email?.trim() || '',
-          phone: newCustomer.phone?.trim() || '',
-          address: newCustomer.address?.trim() || '',
-          gstin: newCustomer.gstin?.trim() || '',
-          contactPerson: newCustomer.contactPerson?.trim() || '',
-          placeOfSupply: newCustomer.placeOfSupply || '',
-          pinCode: newCustomer.pinCode?.trim() || '',
-          shippingAddress: newCustomerSameAsBilling ? newCustomer.address?.trim() : newCustomer.shippingAddress?.trim() || ''
-      };
+        // REQUIRED FIELD VALIDATION
+        if (
+            !newCustomer.name.trim() ||
+            !newCustomer.email.trim() ||
+            !newCustomer.phone.trim() ||
+            !newCustomer.address.trim() ||
+            (!newCustomerSameAsBilling && !newCustomer.shippingAddress.trim()) ||
+            !newCustomer.placeOfSupply.trim() ||
+            !newCustomer.pinCode.trim()
+        ) {
+            alert('Please fill all required fields');
+            return;
+        }
 
-      try {
-          await CustomerService.saveCustomer(custToSave);
-          setCustomers(prev => [...prev, custToSave]);
-          
-          handleCustomerSelect(custToSave);
+        const custToSave: Customer = {
+            id: `cust_${Date.now()}`,
+            name: newCustomer.name.trim(),
+            email: newCustomer.email.trim(),
+            phone: newCustomer.phone.trim(),
+            address: newCustomer.address.trim(),
+            shippingAddress: newCustomerSameAsBilling
+                ? newCustomer.address.trim()
+                : newCustomer.shippingAddress.trim(),
+            placeOfSupply: newCustomer.placeOfSupply.trim(),
+            pinCode: newCustomer.pinCode.trim(),
+            contactPerson: newCustomer.contactPerson?.trim() || '',
+            gstin: newCustomer.gstin?.trim() || ''
+        };
 
-          setShowAddCustomerModal(false);
-          setNewCustomer({ 
-              id: '', name: '', email: '', phone: '', address: '', gstin: '', 
-              contactPerson: '', shippingAddress: '', placeOfSupply: '', pinCode: '' 
-          });
-          setNewCustomerSameAsBilling(false);
-      } catch (error) {
-          console.error("Failed to save customer", error);
-          alert("Failed to save customer. Please try again.");
-      }
-  };
+        try {
+            await CustomerService.saveCustomer(custToSave);
+            setCustomers(prev => [...prev, custToSave]);
+
+            handleCustomerSelect(custToSave);
+
+            setShowAddCustomerModal(false);
+            setNewCustomerSameAsBilling(false);
+            setNewCustomer({
+                id: '',
+                name: '',
+                email: '',
+                phone: '',
+                address: '',
+                shippingAddress: '',
+                placeOfSupply: '',
+                pinCode: '',
+                contactPerson: '',
+                gstin: ''
+            });
+        } catch (error) {
+            console.error(error);
+            alert('Failed to save customer');
+        }
+    };
 
   const handleAddItem = () => {
     const newItem: LineItem = {
@@ -970,50 +989,134 @@ const CreateInvoice: React.FC = () => {
       </div>
 
       {/* --- Add Client Modal --- */}
-      {showAddCustomerModal && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-              <div className="absolute inset-0 bg-gray-900/60 backdrop-blur-sm" onClick={() => setShowAddCustomerModal(false)}></div>
-              <div className="relative bg-white rounded-xl shadow-2xl w-full max-w-lg p-6 animate-fade-in-up">
-                  <div className="flex justify-between items-center mb-6">
-                      <h3 className="text-lg font-bold text-gray-900">Add New Client</h3>
-                      <button onClick={() => setShowAddCustomerModal(false)} className="text-gray-400 hover:text-gray-600">
-                          <XMarkIcon className="w-6 h-6" />
-                      </button>
-                  </div>
-                  <div className="space-y-4">
-                      <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-1">Company / Client Name *</label>
-                          <input type="text" className="w-full border border-gray-300 rounded-lg p-2 text-sm" value={newCustomer.name} onChange={(e) => setNewCustomer({...newCustomer, name: e.target.value})} />
+          {/* --- Add Client Modal --- */}
+          {showAddCustomerModal && (
+              <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+                  <div
+                      className="absolute inset-0 bg-gray-900/60"
+                      onClick={() => setShowAddCustomerModal(false)}
+                  />
+
+                  <div className="relative bg-white rounded-xl shadow-xl w-full max-w-lg p-6">
+                      <div className="flex justify-between mb-4">
+                          <h3 className="text-lg font-bold">Add New Client</h3>
+                          <button onClick={() => setShowAddCustomerModal(false)}>
+                              <XMarkIcon className="w-5 h-5" />
+                          </button>
                       </div>
-                      <div className="grid grid-cols-2 gap-4">
-                          <input type="email" placeholder="Email" className="border border-gray-300 rounded-lg p-2 text-sm" value={newCustomer.email} onChange={(e) => setNewCustomer({...newCustomer, email: e.target.value})} />
-                          <input type="tel" placeholder="Phone" className="border border-gray-300 rounded-lg p-2 text-sm" value={newCustomer.phone} onChange={(e) => setNewCustomer({...newCustomer, phone: e.target.value})} />
-                      </div>
-                      <div className="grid grid-cols-2 gap-4">
-                          <input type="text" placeholder="Contact Person" className="border border-gray-300 rounded-lg p-2 text-sm" value={newCustomer.contactPerson} onChange={(e) => setNewCustomer({...newCustomer, contactPerson: e.target.value})} />
-                          <input type="text" placeholder="GSTIN" className="border border-gray-300 rounded-lg p-2 text-sm uppercase" value={newCustomer.gstin} onChange={(e) => setNewCustomer({...newCustomer, gstin: e.target.value})} />
-                      </div>
-                      <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-1">Billing Address</label>
-                          <textarea rows={2} className="w-full border border-gray-300 rounded-lg p-2 text-sm" value={newCustomer.address} onChange={(e) => handleNewCustomerAddressChange(e.target.value)}></textarea>
-                      </div>
-                      <div>
-                          <label className="flex items-center gap-2 cursor-pointer mb-1">
-                              <input type="checkbox" className="w-4 h-4 text-indigo-600 rounded border-gray-300" checked={newCustomerSameAsBilling} onChange={handleNewCustomerSameAsBillingChange} />
-                              <span className="text-sm text-gray-600">Shipping same as Billing</span>
+
+                      <div className="space-y-3">
+                          <input
+                              className="w-full border rounded p-2"
+                              placeholder="Client Name *"
+                              value={newCustomer.name}
+                              onChange={e => setNewCustomer({ ...newCustomer, name: e.target.value })}
+                          />
+
+                          <div className="grid grid-cols-2 gap-3">
+                              <input
+                                  className="border rounded p-2"
+                                  placeholder="Email *"
+                                  value={newCustomer.email}
+                                  onChange={e => setNewCustomer({ ...newCustomer, email: e.target.value })}
+                              />
+                              <input
+                                  className="border rounded p-2"
+                                  placeholder="Phone *"
+                                  value={newCustomer.phone}
+                                  onChange={e => setNewCustomer({ ...newCustomer, phone: e.target.value })}
+                              />
+                          </div>
+
+                          <textarea
+                              className="w-full border rounded p-2"
+                              placeholder="Billing Address *"
+                              value={newCustomer.address}
+                              onChange={e => handleNewCustomerAddressChange(e.target.value)}
+                          />
+
+                          <label className="flex items-center gap-2 text-sm">
+                              <input
+                                  type="checkbox"
+                                  checked={newCustomerSameAsBilling}
+                                  onChange={handleNewCustomerSameAsBillingChange}
+                              />
+                              Shipping same as billing
                           </label>
+
                           {!newCustomerSameAsBilling && (
-                              <textarea rows={2} placeholder="Shipping Address" className="w-full border border-gray-300 rounded-lg p-2 text-sm mt-1" value={newCustomer.shippingAddress} onChange={(e) => setNewCustomer({...newCustomer, shippingAddress: e.target.value})}></textarea>
+                              <textarea
+                                  className="w-full border rounded p-2"
+                                  placeholder="Shipping Address *"
+                                  value={newCustomer.shippingAddress}
+                                  onChange={e =>
+                                      setNewCustomer({ ...newCustomer, shippingAddress: e.target.value })
+                                  }
+                              />
                           )}
-                      </div>
-                      <div className="flex justify-end gap-2 mt-4 pt-4 border-t border-gray-100">
-                          <button onClick={() => setShowAddCustomerModal(false)} className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg text-sm font-medium">Cancel</button>
-                          <button onClick={handleSaveNewCustomer} className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700">Save Client</button>
+
+                          <div className="grid grid-cols-2 gap-3">
+                              <select
+                                  className="border rounded p-2"
+                                  value={newCustomer.placeOfSupply}
+                                  onChange={e =>
+                                      setNewCustomer({ ...newCustomer, placeOfSupply: e.target.value })
+                                  }
+                              >
+                                  <option value="">Place of Supply *</option>
+                                  {INDIAN_STATES.map(s => (
+                                      <option key={s} value={s}>{s}</option>
+                                  ))}
+                              </select>
+
+                              <input
+                                  className="border rounded p-2"
+                                  placeholder="Pin Code *"
+                                  value={newCustomer.pinCode}
+                                  onChange={e =>
+                                      setNewCustomer({ ...newCustomer, pinCode: e.target.value })
+                                  }
+                              />
+                          </div>
+
+                          <div className="grid grid-cols-2 gap-3">
+                              <input
+                                  className="border rounded p-2"
+                                  placeholder="Contact Person (Optional)"
+                                  value={newCustomer.contactPerson}
+                                  onChange={e =>
+                                      setNewCustomer({ ...newCustomer, contactPerson: e.target.value })
+                                  }
+                              />
+                              <input
+                                  className="border rounded p-2 uppercase"
+                                  placeholder="GSTIN (Optional)"
+                                  value={newCustomer.gstin}
+                                  onChange={e =>
+                                      setNewCustomer({ ...newCustomer, gstin: e.target.value })
+                                  }
+                              />
+                          </div>
+
+                          <div className="flex justify-end gap-2 pt-4">
+                              <button
+                                  onClick={() => setShowAddCustomerModal(false)}
+                                  className="px-4 py-2 text-gray-600"
+                              >
+                                  Cancel
+                              </button>
+                              <button
+                                  onClick={handleSaveNewCustomer}
+                                  className="px-4 py-2 bg-indigo-600 text-white rounded"
+                              >
+                                  Save Client
+                              </button>
+                          </div>
                       </div>
                   </div>
               </div>
-          </div>
-      )}
+          )}
+
     </div>
   );
 };

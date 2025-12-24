@@ -5,7 +5,7 @@ import { InvoiceData, PaymentStatus, PaymentGateway } from '@types';
 // This fixes "Failed to fetch" when accessing via network IP (e.g. mobile testing) 
 // or when CORS preflight fails on localhost mismatch.
 const API_BASE = '/api'; 
-const LOCAL_STORAGE_KEY = 'paylink_invoices';
+const LOCAL_STORAGE_KEY = 'u840660637_invoice_db';
 
 // --- Helper to normalize DB response (TitleCase) to Frontend (camelCase) ---
 const mapInvoiceFromBackend = (data: any): InvoiceData => {
