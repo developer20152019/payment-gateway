@@ -7,6 +7,7 @@ const crypto = require('crypto');
 const Razorpay = require('razorpay');
 const nodemailer = require('nodemailer');
 const path = require('path');
+const fs = require('fs');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -285,6 +286,89 @@ app.delete('/api/invoices/:id', async (req, res) => {
         res.json({ success: true });
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
+// --- Route: Save Paid Invoice PDF ---
+// POST: Save PDF file
+app.post('/api/invoices/:id/save-pdf', (req, res) => {
+    try {
+        const { id } = req.params;
+        const { pdfBase64 } = req.body;
+
+        // Validate input
+        if (!pdfBase64) {
+            return res.status(400).json({ message: 'PDF data missing' });
+        }
+
+        if (typeof pdfBase64 !== 'string') {
+            return res.status(400).json({ message: 'PDF must be a string' });
+        }
+
+        // Strip data URI prefix if it exists (defensive)
+        let base64Data = pdfBase64;
+        if (base64Data.includes(',')) {
+            base64Data = base64Data.split(',')[1];
+        }
+
+        // Create uploads directory if it doesn't exist
+        const uploadPath = path.join(process.cwd(), 'uploads', 'invoices');
+        if (!fs.existsSync(uploadPath)) {
+            fs.mkdirSync(uploadPath, { recursive: true });
+        }
+
+        // Create safe filename
+        const safeFileName = `PAID-${id.replace(/[^a-z0-9]/gi, '_')}.pdf`;
+        const filePath = path.join(uploadPath, safeFileName);
+
+        // Validate base64 before writing
+        if (!base64Data.trim()) {
+            return res.status(400).json({ message: 'PDF data is empty' });
+        }
+
+        // Write PDF file
+        fs.writeFileSync(filePath, base64Data, 'base64');
+
+        console.log(`✅ Paid invoice PDF saved: ${filePath}`);
+
+        res.json({
+            success: true,
+            filePath,
+            fileName: safeFileName,
+            message: 'PDF saved successfully'
+        });
+
+    } catch (err) {
+        console.error('❌ PDF save failed:', err.message);
+        res.status(500).json({
+            message: 'PDF save failed',
+            error: err.message
+        });
+    }
+});
+
+//  View PDF in Browser
+// ============================================
+app.get('/api/invoices/:id/view-pdf', (req, res) => {
+    try {
+        const { id } = req.params;
+        const safeFileName = `PAID-${id.replace(/[^a-z0-9]/gi, '_')}.pdf`;
+        const filePath = path.join(__dirname, 'uploads', 'invoices', safeFileName);
+
+        if (!fs.existsSync(filePath)) {
+            return res.status(404).json({ message: 'PDF not found' });
+        }
+
+        // Set headers to display in browser instead of download
+        res.setHeader('Content-Type', 'application/pdf');
+        res.setHeader('Content-Disposition', 'inline; filename=' + safeFileName);
+
+        // Stream file to response
+        const fileStream = fs.createReadStream(filePath);
+        fileStream.pipe(res);
+
+    } catch (err) {
+        console.error('❌ Error viewing PDF:', err.message);
+        res.status(500).json({ error: err.message });
+    }
+});
 
 // 5. NOTIFICATIONS (Email)
 app.post('/api/notify', async (req, res) => {
@@ -341,6 +425,10 @@ app.post('/api/whatsapp/send', async (req, res) => {
 
     let payload = {};
     if (triggerType === 'PAID') {
+
+        const pdfUrl = `${process.env.APP_BASE_URL}/api/invoices/${invoiceNumber}/view-pdf`;
+        console.log("✅ pdf Sent. ID:", pdfUrl);
+        console.log("✅Number. ID:", invoiceNumber);
         payload = {
             from: fromNumber,
             to: recipient,
@@ -349,7 +437,7 @@ app.post('/api/whatsapp/send', async (req, res) => {
                 name: "payment_rcv_inv",
                 language: { code: "en", policy: "deterministic" },
                 components: [
-                    { type: "header", parameters: [{ type: "document", document: { link: link, filename: "Invoice_from_Wappie.pdf" } }] },
+                    { type: "header", parameters: [{ type: "document", document: { link: pdfUrl, filename: "Invoice_from_Wappie.pdf" } }] },
                     { type: "body", parameters: [{ type: "text", text: buyerName || "Customer" }, { type: "text", text: amount.toString() }, { type: "text", text: invoiceNumber }] }
                 ]
             }
@@ -382,6 +470,7 @@ app.post('/api/whatsapp/send', async (req, res) => {
             return res.status(response.status).json(data);
         }
         console.log("✅ WhatsApp Sent. ID:", data.id);
+        
         res.json(data);
     } catch (error) {
         console.error("❌ YCloud Network Error:", error);

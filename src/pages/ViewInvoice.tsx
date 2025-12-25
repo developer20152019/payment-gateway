@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+﻿import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { InvoiceData, PaymentStatus } from '../types';
 import { InvoicePreview } from '../components/InvoicePreview';
@@ -63,61 +63,246 @@ const ViewInvoice: React.FC = () => {
       } else {
           fallbackCopy();
       }
-  };
-    
-    const generateAndSendPDF = useCallback(async (currentInvoice: InvoiceData, triggerType: 'CREATED' | 'PAID') => {
-        setIsSendingEmail(true);
-        showNotification(triggerType === 'PAID' ? "Processing Payment Receipt..." : "Generating Document...", 'info');
+    };
+    const PDF_WIDTH = 770; // A4 portrait safe 
+   
+    const generateAndSendPDF = useCallback(
+        async (currentInvoice: InvoiceData, triggerType: 'CREATED' | 'PAID') => {
+            setIsSendingEmail(true);
+            showNotification(
+                triggerType === 'PAID'
+                    ? 'Processing Payment Receipt...'
+                    : 'Generating Document...',
+                'info'
+            );
+            await new Promise(resolve => setTimeout(resolve, 500));
 
-        // Wait for the DOM to render updated invoice
-        await new Promise(resolve => setTimeout(resolve, 500));
-        const element = document.getElementById('invoice-content');
+            const originalElement = document.getElementById('invoice-content');
+            if (!originalElement || typeof (window as any).html2pdf === 'undefined') {
+                showNotification('PDF generation failed. Refresh page.', 'error');
+                setIsSendingEmail(false);
+                return;
+            }
 
-        if (!element || typeof (window as any).html2pdf === 'undefined') {
-            console.error("PDF error: Element or library missing");
-            showNotification("PDF generation failed. Refresh page.", 'error');
-            setIsSendingEmail(false);
+            // ================================
+            // SAVE ORIGINAL WIDTHS
+            // ================================
+            const originalHtmlWidth = document.documentElement.style.width;
+            const originalBodyWidth = document.body.style.width;
+
+            // FORCE A4 SAFE WIDTH
+            document.documentElement.style.width = `${PDF_WIDTH}px`;
+            document.body.style.width = `${PDF_WIDTH}px`;
+
+            // ================================
+            // SANDBOX
+            // ================================
+            const sandbox = document.createElement('div');
+
+            sandbox.style.position = 'absolute';
+            sandbox.style.left = '-99999px';
+            sandbox.style.top = '0';
+            sandbox.style.width = `${PDF_WIDTH}px`;
+            sandbox.style.minHeight = '100vh';
+            sandbox.style.backgroundColor = '#ffffff';
+            sandbox.style.pointerEvents = 'none';
+            sandbox.style.overflow = 'hidden';
+            sandbox.style.visibility = 'hidden';
+
+
+            // ================================
+            // CLONE + HARD RESET
+            // ================================
+            const clone = originalElement.cloneNode(true) as HTMLElement;
+
+            clone.style.width = `${PDF_WIDTH}px`;
+            clone.style.maxWidth = `${PDF_WIDTH}px`;
+            clone.style.margin = '0';
+            clone.style.padding = '0';
+            clone.style.boxShadow = 'none';
+            clone.style.position = 'relative';
+            clone.style.transform = 'none';
+            clone.style.left = '0';
+            clone.style.right = '0';
+            clone.style.display = 'block';
+            clone.style.boxSizing = 'border-box';
+
+            sandbox.appendChild(clone);
+            document.body.appendChild(sandbox);
+
+            // WAIT FOR LAYOUT
+            await new Promise(resolve => setTimeout(resolve, 400));
+
+            // ================================
+            // PDF OPTIONS
+            // ================================
+            const opt = {
+                margin: 5,
+                filename: `${currentInvoice.paidInvoiceNumber || currentInvoice.invoiceNumber}.pdf`,
+                image: { type: 'jpeg', quality: 0.98 },
+                html2canvas: {
+                    scale: 2,
+                    useCORS: true,
+                    windowWidth: PDF_WIDTH,
+                    scrollX: 0,
+                    scrollY: 0,
+                    x: 0,
+                    y: 0
+                },
+                jsPDF: {
+                    unit: 'mm',
+                    format: 'a4',
+                    orientation: 'portrait'
+                }
+            };
+
+            try {
+                // GENERATE PDF BASE64
+                const pdfBase64 = await (window as any)
+                    .html2pdf()
+                    .from(clone)
+                    .set(opt)
+                    .outputPdf('datauristring');
+
+                // CLEANUP
+                document.body.removeChild(sandbox);
+                document.documentElement.style.width = originalHtmlWidth;
+                document.body.style.width = originalBodyWidth;
+
+                // ================================
+                // EMAIL
+                // ================================
+                let emailSuccess = false;
+                try {
+                    await InvoiceService.sendPdfByEmail(currentInvoice, pdfBase64, triggerType);
+                    emailSuccess = true;
+                } catch {
+                    showNotification('Email failed. Trying WhatsApp...', 'warning');
+                }
+
+                // ================================
+                // WHATSAPP
+                // ================================
+                try {
+                    await InvoiceService.sendWhatsAppNotification(currentInvoice, triggerType);
+                    showNotification(
+                        emailSuccess
+                            ? 'Email & WhatsApp sent!'
+                            : 'WhatsApp sent successfully!',
+                        'success'
+                    );
+                } catch {
+                    if (!emailSuccess) {
+                        showNotification('Failed to send notifications.', 'error');
+                    }
+                }
+
+                setShowShareModal(true);
+            } catch (error) {
+                console.error('PDF error:', error);
+                showNotification('Failed to generate PDF.', 'error');
+
+                if (document.body.contains(sandbox)) {
+                    document.body.removeChild(sandbox);
+                }
+            } finally {
+                setIsSendingEmail(false);
+            }
+        },
+        []
+    );
+
+
+
+    const handleDownloadPdf = async () => {
+        if (!invoice) return;
+        setIsDownloading(true);
+
+        const originalElement = document.getElementById('invoice-content');
+        if (!originalElement || typeof (window as any).html2pdf === 'undefined') {
+            alert('PDF library loading. Please try again.');
+            setIsDownloading(false);
             return;
         }
 
+        // SAVE ORIGINAL WIDTH
+        const originalHtmlWidth = document.documentElement.style.width;
+        const originalBodyWidth = document.body.style.width;
+
+        document.documentElement.style.width = `${PDF_WIDTH}px`;
+        document.body.style.width = `${PDF_WIDTH}px`;
+
+        // SANDBOX
+        const sandbox = document.createElement('div');
+
+        sandbox.style.position = 'absolute';
+        sandbox.style.left = '-99999px';
+        sandbox.style.top = '0';
+        sandbox.style.width = `${PDF_WIDTH}px`;
+        sandbox.style.minHeight = '100vh';
+        sandbox.style.backgroundColor = '#ffffff';
+        sandbox.style.pointerEvents = 'none';
+        sandbox.style.overflow = 'hidden';
+        sandbox.style.visibility = 'hidden';
+
+
+        // CLONE
+        const clone = originalElement.cloneNode(true) as HTMLElement;
+
+        clone.style.width = `${PDF_WIDTH}px`;
+        clone.style.maxWidth = `${PDF_WIDTH}px`;
+        clone.style.margin = '0';
+        clone.style.padding = '0';
+        clone.style.boxShadow = 'none';
+        clone.style.position = 'relative';
+        clone.style.transform = 'none';
+        clone.style.left = '0';
+        clone.style.right = '0';
+        clone.style.display = 'block';
+        clone.style.boxSizing = 'border-box';
+
+        sandbox.appendChild(clone);
+        document.body.appendChild(sandbox);
+
+        await new Promise(resolve => setTimeout(resolve, 400));
+
         const opt = {
             margin: 5,
-            filename: `${currentInvoice.paidInvoiceNumber || currentInvoice.invoiceNumber}.pdf`,
+            filename: `${invoice.invoiceNumber}.pdf`,
             image: { type: 'jpeg', quality: 0.98 },
-            html2canvas: { scale: 2, useCORS: true, letterRendering: true },
-            jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+            html2canvas: {
+                scale: 2,
+                useCORS: true,
+                windowWidth: PDF_WIDTH,
+                scrollX: 0,
+                scrollY: 0,
+                x: 0,
+                y: 0
+            },
+            jsPDF: {
+                unit: 'mm',
+                format: 'a4',
+                orientation: 'portrait'
+            }
         };
 
         try {
-            const pdfBase64 = await (window as any).html2pdf().from(element).set(opt).outputPdf('datauristring');
-
-            let emailSuccess = false;
-
-            try {
-                await InvoiceService.sendPdfByEmail(currentInvoice, pdfBase64, triggerType);
-                emailSuccess = true;
-            } catch (emailError) {
-                console.warn("Email failed:", emailError);
-                showNotification("Email failed. Trying WhatsApp...", 'warning');
-            }
-
-            try {
-                await InvoiceService.sendWhatsAppNotification(currentInvoice, triggerType);
-                showNotification(emailSuccess ? "Email & WhatsApp sent!" : "WhatsApp sent successfully!", 'success');
-            } catch (waError) {
-                console.error("WhatsApp failed:", waError);
-                if (!emailSuccess) showNotification("Failed to send notifications.", 'error');
-            }
-
-            setShowShareModal(true);
-
+            await (window as any).html2pdf().from(clone).set(opt).save();
+            showNotification('PDF Downloaded', 'success');
         } catch (error) {
-            console.error("PDF generation error:", error);
-            showNotification("Failed to generate PDF.", 'error');
+            console.error(error);
+            showNotification('PDF generation failed', 'error');
         } finally {
-            setIsSendingEmail(false);
+            if (document.body.contains(sandbox)) {
+                document.body.removeChild(sandbox);
+            }
+
+            document.documentElement.style.width = originalHtmlWidth;
+            document.body.style.width = originalBodyWidth;
+
+            setIsDownloading(false);
         }
-    }, []);
+    };
 
   const fetchInvoice = useCallback(async () => {
     if (id) {
@@ -338,35 +523,35 @@ const ViewInvoice: React.FC = () => {
     }
   };
 
-  const handleDownloadPdf = async () => {
-    if(!invoice) return;
-    setIsDownloading(true);
-    const element = document.getElementById('invoice-content');
+  //const handleDownloadPdf = async () => {
+  //  if(!invoice) return;
+  //  setIsDownloading(true);
+  //  const element = document.getElementById('invoice-content');
     
-    if (typeof (window as any).html2pdf === 'undefined') {
-      alert("PDF library loading. Please try again.");
-      setIsDownloading(false);
-      return;
-    }
+  //  if (typeof (window as any).html2pdf === 'undefined') {
+  //    alert("PDF library loading. Please try again.");
+  //    setIsDownloading(false);
+  //    return;
+  //  }
 
-    const opt = {
-      margin: 5,
-      filename: `${invoice.invoiceNumber}.pdf`,
-      image: { type: 'jpeg', quality: 0.98 },
-      html2canvas: { scale: 2, useCORS: true },
-      jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
-    };
+  //  const opt = {
+  //    margin: 5,
+  //    filename: `${invoice.invoiceNumber}.pdf`,
+  //    image: { type: 'jpeg', quality: 0.98 },
+  //    html2canvas: { scale: 2, useCORS: true },
+  //    jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+  //  };
 
-    try {
-      await (window as any).html2pdf().from(element).set(opt).save();
-      showNotification("PDF Downloaded", 'success');
-    } catch (error) {
-      console.error(error);
-      showNotification("PDF generation failed", 'error');
-    } finally {
-      setIsDownloading(false);
-    }
-  };
+  //  try {
+  //    await (window as any).html2pdf().from(element).set(opt).save();
+  //    showNotification("PDF Downloaded", 'success');
+  //  } catch (error) {
+  //    console.error(error);
+  //    showNotification("PDF generation failed", 'error');
+  //  } finally {
+  //    setIsDownloading(false);
+  //  }
+  //};
 
   if (!invoice) return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50">

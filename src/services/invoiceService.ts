@@ -292,7 +292,34 @@ export const InvoiceService = {
         LocalStorageService.save(invoices);
       }
     }
-  },
+    },
+    // services/invoiceService.ts
+    savePaidInvoicePdf: async (
+        invoiceId: string,
+        pdfBase64: string
+    ) => {
+        console.log('📤 Sending PDF to backend for invoice:', invoiceId);
+        console.log('📋 Base64 length:', pdfBase64.length);
+
+        const res = await fetch(
+            `/api/invoices/${invoiceId}/save-pdf`,
+            {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ pdfBase64 })
+            }
+        );
+
+        if (!res.ok) {
+            const text = await res.text();
+            console.error('❌ Backend error:', text);
+            throw new Error('Failed to save PDF');
+        }
+
+        return res.json();
+    },
+
+
 
   // --- Notification ---
   sendEmailNotification: async (invoice: InvoiceData, type: 'CREATED' | 'PAID') => {
@@ -321,7 +348,14 @@ export const InvoiceService = {
     const link = `${window.location.origin}${window.location.pathname}#/view/${invoice.id}`;
     // Strip data URI prefix if present (e.g. "data:application/pdf;base64,")
     const base64Content = pdfBase64.includes(',') ? pdfBase64.split(',')[1] : pdfBase64;
-
+      if (type === 'PAID') {
+          try {
+              await InvoiceService.savePaidInvoicePdf(invoice.paidInvoiceNumber, base64Content);
+              console.log('✅ Paid invoice PDF saved successfully');
+          } catch (err) {
+              console.error('❌ Failed to save PDF:', err);
+          }
+      }
     const { subject, body } = generateEmailContent(invoice, link, type);
 
     const response = await fetch(`${API_BASE}/notify`, {

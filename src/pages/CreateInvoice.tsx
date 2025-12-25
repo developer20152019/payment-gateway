@@ -40,13 +40,19 @@ const RESOURCE_SECTIONS = getEnvArray('VITE_RESOURCE_SECTIONS', DEFAULT_SECTIONS
 const RESOURCE_NAMES = getEnvArray('VITE_RESOURCE_NAMES', DEFAULT_NAMES);
 
 const generateInvoiceNumber = () => {
-  const date = new Date();
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
-  const random = Math.floor(1000 + Math.random() * 9000);
-  return `EST-${year}${month}${day}-${random}`;
+  const now = new Date();
+
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  const day = String(now.getDate()).padStart(2, '0');
+
+  const hours = String(now.getHours()).padStart(2, '0');
+  const minutes = String(now.getMinutes()).padStart(2, '0');
+  const seconds = String(now.getSeconds()).padStart(2, '0');
+
+  return `EST-${year}${month}${day}-${hours}${minutes}${seconds}`;
 };
+
 
 // Default data for a fresh invoice
 const getInitialInvoice = (): InvoiceData => ({
