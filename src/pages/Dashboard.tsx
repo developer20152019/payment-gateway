@@ -163,7 +163,7 @@ const Dashboard: React.FC = () => {
 
   const handleCopyLink = (e: React.MouseEvent, id: string) => {
     e.stopPropagation();
-    const url = `${window.location.origin}${window.location.pathname}#/view/${id}`;
+    const url = `${window.location.origin}/view/${id}`;
     
     const copyToClipboard = (text: string) => {
         if (navigator.clipboard && navigator.clipboard.writeText) {
