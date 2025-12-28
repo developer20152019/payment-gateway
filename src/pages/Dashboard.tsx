@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { InvoiceData, PaymentStatus, DocumentType } from '../types';
 import { InvoiceService } from '../services/invoiceService';
 import { PlusIcon, DocumentTextIcon, TrashIcon, MagnifyingGlassIcon, LinkIcon, CheckIcon, XMarkIcon, ArrowUpIcon, ArrowDownIcon, BanknotesIcon, PencilIcon, TagIcon, ClipboardDocumentListIcon, UsersIcon, Cog6ToothIcon, MapPinIcon, ArrowRightOnRectangleIcon, CalendarIcon, ClockIcon, ChevronDownIcon, FunnelIcon } from '@heroicons/react/24/outline';
-
+import axios from 'axios';
 const INDIAN_STATES = [
   "Andhra Pradesh", "Arunachal Pradesh", "Assam", "Bihar", "Chhattisgarh", "Goa", "Gujarat", "Haryana", 
   "Himachal Pradesh", "Jharkhand", "Karnataka", "Kerala", "Madhya Pradesh", "Maharashtra", "Manipur", 
@@ -11,7 +11,20 @@ const INDIAN_STATES = [
   "Tripura", "Uttar Pradesh", "Uttarakhand", "West Bengal", "Andaman and Nicobar Islands", "Chandigarh", 
   "Dadra and Nagar Haveli and Daman and Diu", "Delhi", "Jammu and Kashmir", "Ladakh", "Lakshadweep", "Puducherry"
 ];
+const handleLogout = async () => {
+    try {
+        // 1. Tell backend to destroy the session
+        await axios.post('/api/logout');
 
+        // 2. Force a hard reload to the login page
+        // This ensures all React states are cleared and the auth check runs again
+        window.location.href = '/login';
+    } catch (error) {
+        console.error("Logout failed", error);
+        // Fallback if server fails
+        window.location.href = '/login';
+    }
+};
 // Helper to format date to IST with time
 const formatDateToIST = (dateString: string) => {
   if (!dateString) return '-';
@@ -148,10 +161,7 @@ const Dashboard: React.FC = () => {
     return { revenue, pending, label };
   }, [invoices, statsRangeOption]);
 
-  const handleLogout = () => {
-      localStorage.removeItem('isAuthenticated');
-      navigate('/login');
-  };
+ 
 
   const handleDelete = async (e: React.MouseEvent, id: string) => {
     e.stopPropagation();

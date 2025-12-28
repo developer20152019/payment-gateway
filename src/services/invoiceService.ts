@@ -383,7 +383,7 @@ export const InvoiceService = {
   },
 
   sendWhatsAppNotification: async (invoice: InvoiceData, triggerType: 'CREATED' | 'PAID' = 'CREATED'): Promise<void> => {
-    const link = `${window.location.origin}${window.location.pathname}#/view/${invoice.id}`;
+    const link = `${window.location.origin}/view/${invoice.id}`;
     const docType = invoice.type === 'QUOTATION' ? 'Estimate' : 'Invoice';
     const number = invoice.paidInvoiceNumber || invoice.invoiceNumber;
     const amount = new Intl.NumberFormat('en-IN', { style: 'currency', currency: invoice.currency }).format(invoice.total);
